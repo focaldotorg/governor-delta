@@ -1,0 +1,5 @@
+@interfaces/=src/interfaces
+@lib/=src/lib/
+@root/=src/
+
+forge-std/=lib/forge-std/src/
