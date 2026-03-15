@@ -1,48 +1,80 @@
-## Governor Delta 
+## Governor Delta
+An EVM (Ethereum virtual machine) governance system, successor to [Governor Bravo]().
 
-An on-chain governance mechanisim, successor to [Governor Bravo]().
+### Voting Modules
+Implement and configure arbitrary voting power weighting mechanisms, to experiment with diverse governance models without fully compromising system autonomy.
 
-### Voting modules 
+#### Strategies
+* `TokenWeightedVotingStrategy` — plutocratic voting model (one-share-one-vote)
+* `QuadLinearVotingStrategy` — a progressive plutocratic voting model [[paper]]()
+* `ConvictionVotingStrategy` — time-weighted contextual voting model
+* `PolycentricVotingStrategy` — time and commitment weighted voting model [[paper]]()
 
-Implement and configure arbitary voting power weighting mechanisims, to expirement with diverse governance models without fully compromising system autonomy.
+---
 
-#### Strategies 
+### Native Delegation
+Governor Delta does not require ERC20Votes or checkpoint extensions on the underlying token. Vote weight is tallied at the point of vote cast, with the participant's balance locked for the duration of the proposal. This enables any ERC20 to participate in governance without token migration or wrapping.
 
-* TokenWeightedVotingStrategy: plutocratic voting model (one-share-one-vote)
-* QuadLinearVotingStrategy: a progressive plutocratic voting model [[paper]]()
-* ConvictionVotingStrategy: time-weighted contextual voting model
+Delegation is handled natively at the governor layer — participants may delegate their locked balance to any address at vote time, with full revocability retained by the delegator for the duration of the proposal.
 
-### Veto timelock 
+---
 
+### Vote Prediction
+```solidity
+function predictVotes(address participant, uint256 proposalId) external view returns (uint256);
+```
+Pre-calculates the final voting power for a participant at proposal execution time. For time-dependent strategies such as `PolycentricVotingStrategy`, VP compounds as `t_effective` accumulates between vote cast and execution. `predictVotes` gives participants and frontends an accurate projection of influence weight at the moment it matters rather than at the moment of casting.
+
+---
+
+### Graduated Proposals
+Governor Delta supports tiered proposal severity, each tier configured with independent quorum and voting duration parameters. This mediates short term voting power advantages on critical decisions through extended voting periods, while enabling agile decision making for lower severity proposals.
+
+| Tier | Severity | Quorum | Duration |
+|------|----------|--------|----------|
+| 0 | Low | 5% | 2 days |
+| 1 | Medium | 15% | 5 days |
+| 2 | High | 30% | 10 days |
+| 3 | Critical | 51% | 14 days |
+
+Tiers are configurable at deployment and adjustable through governance.
+
+---
+
+### Veto Timelock
 Governor Delta addresses a critical flaw in the Governor Bravo timelock mechanism. In Bravo, proposals are subject to a timelock before execution, but only the admin controller and the proposer can cancel transactions. This creates issues for permissionless governance systems:
 
-1. Centralization of veto power in a single admin address
+1. Centralisation of veto power in a single admin address
 2. Inability to respond quickly to problematic proposals once queued
-3. Difficulty in creating a responsive veto mechanism (a veto proposal would also be subject to timelock)
+3. Difficulty in creating a responsive veto mechanism — a veto proposal would also be subject to timelock
 
 Governor Delta introduces a pure veto function allowing token holders to collectively cancel pending timelock proposals without requiring a new proposal process. This creates a more balanced solution for handling adversarial proposals while maintaining a democratic approach.
 
+---
+
 ### Migrating
-#### Alpha
-Migrating from Governor Alpha to Governor Delta requires several steps:
 
-1. Deploy Governor Delta: Set up the new contracts including a TokenWeightedStrategy to maintain the same voting model initially
-1. Propose Migration: Use Governor Alpha to propose transferring authority to the new Governor Delta
-1. Migrate Pending Proposals: Any active proposals in Alpha need to be recreated in Delta
-1. Guardian Transfer: Move the Guardian role to the new contract
-1. Timelock Control: Transfer timelock admin rights to the new Governor Delta
- 
-#### Bravo
-Migrating from Governor Bravo is more straightforward:
+#### From Alpha
+1. Deploy Governor Delta with a `TokenWeightedStrategy` to maintain the same voting model initially
+2. Propose migration via Governor Alpha, transferring authority to the new Governor Delta
+3. Recreate any active proposals in Delta
+4. Transfer the Guardian role to the new contract
+5. Transfer timelock admin rights to Governor Delta
 
-1. Deploy Governor Delta: Set up the new contracts with appropriate strategies
-1. Upgrade Implementation: Use Bravo's upgrade mechanism to point to the new Delta implementation
-1. Initialize Parameters: Configure voting strategy and other parameters
-1. Optional Parameter Migration: Adjust any governance parameters to match previous settings
+#### From Bravo
+Because Governor Delta is designed as an extension of Governor Bravo, many existing contracts can be upgraded in-place:
 
-Because Governor Delta is designed as an extension of Governor Bravo, many existing Governor Bravo contracts can be upgraded in-place to use the new implementation.
+1. Deploy Governor Delta with appropriate strategies
+2. Use Bravo's upgrade mechanism to point to the new Delta implementation
+3. Configure voting strategy and parameters
+4. Optionally adjust governance parameters to match previous settings
 
-## Contributing
+---
 
-Open a well documented issue, referencing the relevant areas of the architecture.
+### Security
+Report vulnerabilities via [ops@focal.org](mailto:research@focal.org). Do not open public issues for security disclosures.
 
+---
+
+### Contributing
+Open a well documented issue referencing the relevant areas of the architecture. Pull requests should include test coverage and a clear description of the motivation and design tradeoffs.
