@@ -6,16 +6,33 @@ Implement and configure arbitrary voting power weighting mechanisms, to experime
 
 #### Strategies
 * `TokenWeightedVotingStrategy` — plutocratic voting model (one-share-one-vote)
-* `QuadLinearVotingStrategy` — a progressive plutocratic voting model [[paper]]()
-* `ConvictionVotingStrategy` — time-weighted contextual voting model
 * `PolycentricVotingStrategy` — time and commitment weighted voting model [[paper]]()
+
+---
+
+### Multi-Asset Governance
+Governor Delta supports multiple asset types as governance inputs within a single deployment, enabling organisations with heterogeneous capital structures to participate in governance without token migration or wrapping. Each token is registered with a configurable scoring weight, allowing organisations with complex capital structures — multiple share classes, LP tokens, receipt tokens, vault shares — to participate in governance without migration or wrapping.
+
+Scoring weights are not immutable. They are configurable parameters adjustable through governance proposals, enabling organisations to rebalance token authority as their capital structure evolves.
+
+```solidity
+function registerToken(address token, uint256 weight) external;
+function updateTokenWeight(address token, uint256 weight) external;
+function getTokenWeight(address token) external view returns (uint256);
+```
+
+Base voting power is computed as the sum of each registered token balance scaled by its configured multiplier. The active voting strategy then applies its weighting model on top of the aggregated base.
 
 ---
 
 ### Native Delegation
 Governor Delta does not require ERC20Votes or checkpoint extensions on the underlying token. Vote weight is tallied at the point of vote cast, with the participant's balance locked for the duration of the proposal. This enables any ERC20 to participate in governance without token migration or wrapping.
 
-Delegation is handled natively at the governor layer — participants may delegate their locked balance to any address at vote time, with full revocability retained by the delegator for the duration of the proposal.
+Delegation is handled natively at the governor layer with two configurable properties:
+
+**Revocability** — delegators retain the right to revoke or redirect voting power at any time during an active proposal, even after delegation has been assigned. This prevents adversarial capture through delegation and ensures governance authority remains with the committed participant.
+
+**Expirations** — delegations are configured with a maximum duration, after which authority automatically returns to the delegator. This prevents idle delegations from accruing significant voting power over time without the delegator's awareness.
 
 ---
 
@@ -72,7 +89,7 @@ Because Governor Delta is designed as an extension of Governor Bravo, many exist
 ---
 
 ### Security
-Report vulnerabilities via [ops@focal.org](mailto:research@focal.org). Do not open public issues for security disclosures.
+Report vulnerabilities via [research@focal.org](mailto:research@focal.org). Do not open public issues for security disclosures.
 
 ---
 
