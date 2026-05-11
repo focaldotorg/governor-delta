@@ -12,15 +12,16 @@ Implement and configure arbitrary voting power weighting mechanisms, to experime
 ---
 
 ### Multi-Asset Governance
-Governor Delta supports multiple asset types as governance inputs within a single deployment, enabling organisations with heterogeneous capital structures to participate in governance without token migration or wrapping. Each token is registered with a configurable scoring weight, allowing organisations with complex capital structures — multiple share classes, LP tokens, receipt tokens, vault shares — to participate in governance without migration or wrapping.
+Governor Delta supports multiple asset types as governance inputs within a single deployment, enabling organisations with heterogeneous capital structures to participate in governance without token migration or wrapping. Each token is registered with a configurable scoring weight, allowing organisations with complex capital structures — multiple share classes, LP tokens, receipt tokens, vault shares — to participate in governance without migration or wrapping. 
 
-Scoring weights are not immutable. They are configurable parameters adjustable through governance proposals, enabling organisations to rebalance token authority as their capital structure evolves.
+_Scoring weights are not immutable, they are configurable parameters adjustable through governance proposals, enabling organisations to rebalance token authority as their capital structure evolves._
+
 ---
 
 ### Native Delegation
 Governor Delta does not require ERC20Votes or checkpoint extensions on the underlying token. Vote weight is tallied at the point of vote cast, with the participant's balance locked for the duration of the proposal. This enables any ERC20 to participate in governance without token migration or wrapping.
 
-Delegation is handled natively at the governor layer with two configurable properties:
+Delegation is handled natively at the application layer with two configurable properties:
 
 **Revocability** — delegators retain the right to revoke or redirect voting power at any time during an active proposal, even after delegation has been assigned. This prevents adversarial capture through delegation and ensures governance authority remains with the committed participant.
 
@@ -29,14 +30,14 @@ Delegation is handled natively at the governor layer with two configurable prope
 ---
 
 ### Graduated Proposals
-Governor Delta supports tiered proposal severity, each tier configured with independent quorum and voting duration parameters. This mediates short term voting power advantages on critical decisions through extended voting periods, while enabling agile decision making for lower severity proposals.
+Governor Delta supports tiered proposal severity, each tier configured with independent quorum and voting duration parameters. This mediates short term voting power advantages on critical decisions through extended voting periods, while enabling agile decision making for lower severity proposals. An example proposal configuration given total supply equal to 100,000 shares:
 
 | Tier | Severity | Quorum | Duration |
 |------|----------|--------|----------|
-| 0 | Low | 5% | 2 days |
-| 1 | Medium | 15% | 5 days |
-| 2 | High | 30% | 10 days |
-| 3 | Critical | 51% | 14 days |
+| 0 | Low | 5,000 | 7 days |
+| 1 | Medium | 15,000 | 14 days |
+| 2 | High | 33,000 | 38 days |
+| 3 | Critical | 51,000 | 92 days |
 
 Tiers are configurable at deployment and adjustable through governance.
 
@@ -79,5 +80,6 @@ Report vulnerabilities via [research@focal.org](mailto:research@focal.org). Do n
 
 ### Contributing
 Open a well documented issue referencing the relevant areas of the architecture. Pull requests should include test coverage and a clear description of the motivation and design tradeoffs.
+
 
 
