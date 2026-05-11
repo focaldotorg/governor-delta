@@ -80,10 +80,4 @@ Report vulnerabilities via [research@focal.org](mailto:research@focal.org). Do n
 ### Contributing
 Open a well documented issue referencing the relevant areas of the architecture. Pull requests should include test coverage and a clear description of the motivation and design tradeoffs.
 
----
 
-### Credits
-
-The Polycentric voting model, the argument for time- and commitment-weighted governance, and the reading-list of cited figures (Malinowski 1922; Berger, Solomon & Benjamin 2017; Shapley & Shubik 1954; Banzhaf 1965; Hylland & Zeckhauser 1979; Ledyard & Palfrey 1994; Douceur 2002; Weyl & Posner 2017) are **Samuel Gosling's own work** in [*The Mathematics of Loyalty*](https://blog.focal.org/the-mathematics-of-loyalty). The mainstream quadratic-voting discourse largely skipped over that lineage; Gosling recovers it.
-
-Engineering deviations we make from the blog post are documented in [DEVIATIONS.md](./DEVIATIONS.md).
