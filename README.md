@@ -5,7 +5,7 @@ An EVM (Ethereum virtual machine) governance system, successor to [Governor Brav
 Implement and configure arbitrary voting power weighting mechanisms, to experiment with diverse governance models without fully compromising system autonomy.
 
 #### Strategies
-* `TokenWeightedVotingStrategy` — plutocratic voting model (one-share-one-vote)
+* `WeightedVotingStrategy` — plutocratic voting model (one-share-one-vote)
 * `TenureVotingStrategy` — linear time-weighted voting (supershares)
 * `PolycentricVotingStrategy` — time and commitment weighted voting model [[paper]]()
 
