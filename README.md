@@ -5,7 +5,8 @@ An EVM (Ethereum virtual machine) governance system, successor to [Governor Brav
 Implement and configure arbitrary voting power weighting mechanisms, to experiment with diverse governance models without fully compromising system autonomy.
 
 #### Strategies
-* `TokenWeightedVotingStrategy` — plutocratic voting model (one-share-one-vote)
+* `WeightedVotingStrategy` — plutocratic voting model (one-share-one-vote)
+* `TenureVotingStrategy` — linear time-weighted voting (supershares)
 * `PolycentricVotingStrategy` — time and commitment weighted voting model [[paper]]()
 
 ---
@@ -14,15 +15,6 @@ Implement and configure arbitrary voting power weighting mechanisms, to experime
 Governor Delta supports multiple asset types as governance inputs within a single deployment, enabling organisations with heterogeneous capital structures to participate in governance without token migration or wrapping. Each token is registered with a configurable scoring weight, allowing organisations with complex capital structures — multiple share classes, LP tokens, receipt tokens, vault shares — to participate in governance without migration or wrapping.
 
 Scoring weights are not immutable. They are configurable parameters adjustable through governance proposals, enabling organisations to rebalance token authority as their capital structure evolves.
-
-```solidity
-function registerToken(address token, uint256 weight) external;
-function updateTokenWeight(address token, uint256 weight) external;
-function getTokenWeight(address token) external view returns (uint256);
-```
-
-Base voting power is computed as the sum of each registered token balance scaled by its configured multiplier. The active voting strategy then applies its weighting model on top of the aggregated base.
-
 ---
 
 ### Native Delegation
@@ -33,14 +25,6 @@ Delegation is handled natively at the governor layer with two configurable prope
 **Revocability** — delegators retain the right to revoke or redirect voting power at any time during an active proposal, even after delegation has been assigned. This prevents adversarial capture through delegation and ensures governance authority remains with the committed participant.
 
 **Expirations** — delegations are configured with a maximum duration, after which authority automatically returns to the delegator. This prevents idle delegations from accruing significant voting power over time without the delegator's awareness.
-
----
-
-### Vote Prediction
-```solidity
-function predictVotes(address participant, uint256 proposalId) external view returns (uint256);
-```
-Pre-calculates the final voting power for a participant at proposal execution time. For time-dependent strategies such as `PolycentricVotingStrategy`, VP compounds as `t_effective` accumulates between vote cast and execution. `predictVotes` gives participants and frontends an accurate projection of influence weight at the moment it matters rather than at the moment of casting.
 
 ---
 
@@ -95,3 +79,5 @@ Report vulnerabilities via [research@focal.org](mailto:research@focal.org). Do n
 
 ### Contributing
 Open a well documented issue referencing the relevant areas of the architecture. Pull requests should include test coverage and a clear description of the motivation and design tradeoffs.
+
+
