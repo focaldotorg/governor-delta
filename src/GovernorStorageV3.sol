@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 pragma solidity ^0.8.10;
 
-contract GovernorBravoDelegatorStorage {
+contract GovernorProxyStorage {
     /// @notice Administrator for this contract
     address public admin;
 
@@ -18,7 +18,7 @@ contract GovernorBravoDelegatorStorage {
  * contract which implements GovernorBravoDelegateStorageV1 and following the naming convention
  * GovernorBravoDelegateStorageVX.
  */
-contract GovernorBravoDelegateStorageV1 is GovernorBravoDelegatorStorage {
+contract GovernorStorageV1 is GovernorProxyStorage {
 
     /// @notice The delay before voting on a proposal may take place, once proposed, in blocks
     uint public votingDelay;
@@ -119,7 +119,7 @@ contract GovernorBravoDelegateStorageV1 is GovernorBravoDelegatorStorage {
     }
 }
 
-contract GovernorBravoDelegateStorageV2 is GovernorBravoDelegateStorageV1 {
+contract GovernorStorageV2 is GovernorStorageV1 {
     /// @notice Stores the expiration of account whitelist status as a timestamp
     mapping (address => uint) public whitelistAccountExpirations;
 
@@ -128,4 +128,4 @@ contract GovernorBravoDelegateStorageV2 is GovernorBravoDelegateStorageV1 {
 }
 
 
-contract GovernorStorageV3 is GovernorBravoDelegateStorageV2 {}
+contract GovernorStorageV3 is GovernorStorageV2 {}
