@@ -2,12 +2,13 @@
 
 ## Omissions
 
-### Checkpoints
+### Configuration Immutability
+Bravo predefined all parameters of governance at deployment time, which fundamentally fails to adapt for changing asset supply and stakeholder demographics. An organisation is never the same as it was last week, a rigid structure not only subjects deployments of Bravo to rigorous thresholds (quotas) and quorums to contest adverserial capture but also erodes participation from barriers to entry. Failure to adequcately calculate sufficient values, additionally leaves an organisation vulnerable to attack with little means for recourse.
 
-Now redacted in Bravo due to the presence of the delegation system, where delegations are tracked natively on locking to the contract, regressing the need for historic lookups.
+### Checkpoints
+Now redacted in Bravo from to the requirement of attesting balances, where stakeholders lock tokens to the contract to signal conviction regressing the need for historic lookups with a checkpoint system. Which while was designed to combat vote-buying, unironically creates the new issue of proposers excercising voting power they may not still retain. As an adversary can create a malicous proposal, vote and then continue to offload the equivalent tokens from the cast voting power on secondary markets, yet still have their weight meaningfully excercised in the ballot. A problem that would be only be exacerbated if a group of actors colluded together.
 
 ### Guardian
-
 Replaced by the more broad timelock restructuring and possible to implement with the new guard system, it still was an unfavorable design choice of Bravo for more distributed organisations.
 
 ## Configuration
@@ -38,15 +39,7 @@ Minimum cannoncial token weight to create a proposal.
 
 #### Veto
 
-Minimum cannoncial token weight for a proposal to reach consensus.
-
-##### Adaptive
-
-Dynamic numerical weight value dervied from the contested proposal canoconcial token turnout.
-
-##### Fixed
-
-Fixed numerical weight value.
+Minimum cannoncial token weight to contest a queued proposal.
 
 #### Graduated
 
@@ -88,7 +81,7 @@ Delegation can be toggled on and off for any deployment.
 
 #### Identifiers
 
-Every delegation action produces a `keccak256(delegator, expiry, amount)` bytehash for used for referenced in validation of coalitions post proposal voting period and create provenance for delegation actions.
+Every delegation action produces a `keccak256(delegator, nonce, delgatee, amount, expiry)` bytehash for used for referenced in validation of coalitions post proposal voting period and create provenance for delegation actions.
 
 #### Management
 
@@ -98,7 +91,7 @@ Delegations are revocable at any time even in when in a pending or active ballot
 
 ### States
 
-Active, rejected, dropped, executed, contested and pending.
+Active, succeeded, defeated, canceled, executed, expired, queued and the new veto state contested.
 
 ### Graduated Proposals
 
