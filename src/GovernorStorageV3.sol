@@ -172,12 +172,41 @@ contract GovernorStorageV3 is GovernorStorageV2 {
     /// @notice The number of votes cast required for a veto proposal to be considered valid
     uint public vetoQuorum; 
 
+    /// @notice A record of states for signing / validating signatures
+    mapping (address => uint) public nonces;
+
+    mapping (address => Stake) internal stakes;
+
+    /// @notice A record of each accounts delegate
+    mapping (address => Delegate) public delegates;
+
     /// @notice The official record of all proposals ever proposed
     mapping (uint => ProposalV2) internal proposals;
 
     /// @notice Graduated proposal parameters 
     mapping(uint8 => Graduated) public proposalConfig;
 
+    /// @notice Deposit metadata
+    struct Stake {
+        /// @notice Total canonical tokens currently locked by the stakeholder
+        uint amount;
+        /// @notice The timestamp of the stakeholder's last attested ballot
+        uint lastVoteTime;
+        /// @notice Timestamp of the last stake state change, used to settle accumulator values
+        uint lastUpdateTime;
+        /// @notice Running sum of stake amount multiplied by time elapsed 
+        uint deltaAmountTime;
+    }
+
+    /// @notice Delegation parameters
+    struct Delegate {
+        /// @notice The timestamp when the delegation is deemed as invalid
+        uint expiry;
+        /// @notice The stakeholder address to assign voting power
+        address target;
+    }
+
+    /// @notice Proposal metadata and parameters
     struct ProposalV2 {
         /// @notice Unique id for looking up a proposal
         uint id;
@@ -223,10 +252,9 @@ contract GovernorStorageV3 is GovernorStorageV2 {
 
         /// @notice Flag marking whether the proposal has been vetoed
         bool contested;
-
     }
 
-    /// @notice Proposal configuration 
+    /// @notice Proposal tallys 
     struct Tally {
         /// @notice Pure votes cast
         Ballot primary;
@@ -248,6 +276,9 @@ contract GovernorStorageV3 is GovernorStorageV2 {
 
         /// @notice Current number of votes for abstaining for this proposal
         uint abstainVotes;
+
+        /// @notice Current number of tokens participating in this proposal
+        uint totalWeight;
     }
 
     /// @notice Proposal voter record
