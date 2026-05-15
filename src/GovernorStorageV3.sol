@@ -172,7 +172,7 @@ contract GovernorStorageV3 is GovernorStorageV2 {
     mapping (uint => ProposalV2) internal proposals;
 
     /// @notice Graduated proposal parameters 
-    mapping(uint8 => ProposalConfig) public parameters;
+    mapping(uint8 => Graduated) public proposalConfig;
 
     struct ProposalV2 {
         /// @notice Unique id for looking up a proposal
@@ -258,7 +258,7 @@ contract GovernorStorageV3 is GovernorStorageV2 {
         uint96 weight;
     }
 
-    struct ProposalConfig {
+    struct Graduated {
         uint256 quorum;
         uint256 duration;
     }
