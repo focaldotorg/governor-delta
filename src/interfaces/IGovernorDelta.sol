@@ -1,6 +1,12 @@
 pragma solidity ^0.8.10;
 
 interface IGovernorDelta {
+    /// @notice Emitted when a stakeholder locks canonical tokens into the governor
+    event Locked(address indexed account, address indexed token, uint96 amount);
+
+    /// @notice Emitted when a stakeholder unlocks canonical tokens from the governor
+    event Unlocked(address indexed account, address indexed token, uint96 amount);
+
     /// @notice An event emitted when a new proposal is created
     event ProposalCreated(uint id, address proposer, address[] targets, uint[] values, string[] signatures, bytes[] calldatas, uint startBlock, uint endBlock, string description);
 

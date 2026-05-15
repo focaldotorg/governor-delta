@@ -175,9 +175,10 @@ contract GovernorStorageV3 is GovernorStorageV2 {
     /// @notice A record of states for signing / validating signatures
     mapping (address => uint) public nonces;
 
+    /// @notice A record of an account's deposit history
     mapping (address => Stake) internal stakes;
 
-    /// @notice A record of each accounts delegate
+    /// @notice A record of an account's delegate
     mapping (address => Delegate) public delegates;
 
     /// @notice The official record of all proposals ever proposed

@@ -68,10 +68,10 @@ contract GovernorDelta is GovernorStorageV3, IGovernorDelta {
       * @param proposalQuota_ The initial proposal threshold
     **/
     function initialize(address timelock_, address token_, uint votingPeriod_, uint votingDelay_, uint proposalQuota_) virtual public {
-        require(address(timelock) == address(0), "GovernorBravo::initialize: can only initialize once");
-        require(msg.sender == admin, "GovernorBravo::initialize: admin only");
-        require(timelock_ != address(0), "GovernorBravo::initialize: invalid timelock address");
-        require(token_ != address(0), "GovernorBravo::initialize: invalid canonical token address");
+        require(address(timelock) == address(0), "GovernorDelta::initialize: can only initialize once");
+        require(msg.sender == admin, "GovernorDelta::initialize: admin only");
+        require(timelock_ != address(0), "GovernorDelta::initialize: invalid timelock address");
+        require(token_ != address(0), "GovernorDelta::initialize: invalid canonical token address");
 
         timelock = ITimelock(timelock_);
         canonicalToken = IERC20(token_);
@@ -89,11 +89,48 @@ contract GovernorDelta is GovernorStorageV3, IGovernorDelta {
     }
 
     /**
+      * @notice Locks canonical tokens into the governor to accrue voting weight
+      * @param amount The amount of canonical tokens to lock
+    **/
+    function lock(uint amount) external {
+        require(amount > 0, "GovernorDelta::lock: invalid amount");
+        Stake storage s = stake[msg.sender];
+        uint256 deltaTime = block.timestamp - s.lastUpdateTime;
+        s.deltaAmountTime += s.amount * deltaTime;
+        s.lastUpdateTime = block.timestamp;
+        s.amount += amount;
+
+        canonicalToken.transferFrom(msg.sender, address(this), amount);
+
+        emit Locked(msg.sender, address(canonicalToken), amount);
+    }
+
+    /**
+      * @notice Withdraws canonical tokens from the governor
+      * @dev Settling prior period before mutating amount ensures deltaAmountTime is accurate
+      * @param amount The amount of canonical tokens to withdraw
+    **/
+    function unlock(uint amount) external {
+        Stake storage s = stake[msg.sender];
+        require(amount > 0, "GovernorDelta::withdraw: invalid amount");
+        require(amount <= s.amount, "GovernorDelta::withdraw: insufficient balance");
+        require(block.timestamp > s.lastVoteTime, "GovernorDelta::withdraw: active vote");
+        uint256 deltaTime = block.timestamp - s.lastUpdateTime;
+        s.deltaAmountTime += s.amount * deltaTime;
+        s.lastUpdateTime = block.timestamp;
+        s.amount -= amount;
+
+        canonicalToken.transfer(msg.sender, amount);
+
+        emit Unlocked(msg.sender, address(canonicalToken), amount);
+    }
+
+    /**
       * @notice Admin function for setting the voting delay
       * @param newVotingDelay new voting delay, in blocks
     */
     function _setVotingDelay(uint newVotingDelay) external {
-        require(msg.sender == admin, "GovernorBravo::_setVotingDelay: admin only");
+        require(msg.sender == admin, "GovernorDelta::_setVotingDelay: admin only");
         require(newVotingDelay >= MIN_VOTING_DELAY && newVotingDelay <= MAX_VOTING_DELAY, "GovernorBravo::_setVotingDelay: invalid voting delay");
         uint oldVotingDelay = votingDelay;
         votingDelay = newVotingDelay;
@@ -106,7 +143,7 @@ contract GovernorDelta is GovernorStorageV3, IGovernorDelta {
       * @param newVotingPeriod new voting period, in blocks
     */
     function _setVotingPeriod(uint newVotingPeriod) external {
-        require(msg.sender == admin, "GovernorBravo::_setVotingPeriod: admin only");
+        require(msg.sender == admin, "GovernorDelta::_setVotingPeriod: admin only");
         require(newVotingPeriod >= MIN_VOTING_PERIOD && newVotingPeriod <= MAX_VOTING_PERIOD, "GovernorBravo::_setVotingPeriod: invalid voting period");
         uint oldVotingPeriod = votingPeriod;
         votingPeriod = newVotingPeriod;
@@ -120,7 +157,7 @@ contract GovernorDelta is GovernorStorageV3, IGovernorDelta {
       * @param newProposalThreshold new proposal threshold
     */
     function _setProposalQuota(uint newProposalThreshold) external {
-        require(msg.sender == admin, "GovernorBravo::_setProposalThreshold: admin only");
+        require(msg.sender == admin, "GovernorDelta::_setProposalThreshold: admin only");
         uint oldProposalThreshold = proposalThreshold;
         proposalQuota = newProposalThreshold;
 
