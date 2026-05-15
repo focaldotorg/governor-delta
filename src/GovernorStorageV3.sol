@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
 pragma solidity ^0.8.10;
 
+import "@interfaces/ITimelock.sol";
+import "@interfaces/IERC20.sol";
+
 contract GovernorProxyStorage {
     /// @notice Administrator for this contract
     address public admin;
@@ -26,8 +29,12 @@ contract GovernorStorageV1 is GovernorProxyStorage {
     /// @notice The duration of voting on a proposal, in blocks
     uint public votingPeriod;
 
-    /// @notice The number of votes required in order for a voter to become a proposer
-    uint public proposalThreshold;
+    /// @notice ------- DEPRECATED -----------
+    /// @dev REASON: Proxy storage compatibility
+    /// @dev NOTE: Superseded by `proposalQuota`
+    /// @dev DO NOT REMOVE, REORDER, OR REUSE
+    IGovernorToken internal _proposalThreshold;
+    /// @notice ------------------------------
 
     /// @notice Initial proposal id set at become
     uint public initialProposalId;
@@ -36,13 +43,21 @@ contract GovernorStorageV1 is GovernorProxyStorage {
     uint public proposalCount;
 
     /// @notice The address of the Compound Protocol Timelock
-    TimelockInterface public timelock;
+    ITimelock public timelock;
 
-    /// @notice The address of the Compound governance token
-    CompInterface public comp;
+    /// @notice ------- DEPRECATED -----------
+    /// @dev REASON: Proxy storage compatibility
+    /// @dev NOTE: Superseded by `canonicalToken`
+    /// @dev DO NOT REMOVE, REORDER, OR REUSE
+    IGovernorToken internal _comp;
+    /// @notice ------------------------------
 
-    /// @notice The official record of all proposals ever proposed
-    mapping (uint => Proposal) public proposals;
+    /// @notice ------- DEPRECATED -----------
+    /// @dev REASON: Proxy storage compatibility
+    /// @dev NOTE: Superseded by `proposals`
+    /// @dev DO NOT REMOVE, REORDER, OR REUSE
+    mapping (uint => Proposal) internal _proposals;
+    /// @notice ------------------------------
 
     /// @notice The latest proposal for each proposer
     mapping (address => uint) public latestProposalIds;
@@ -117,15 +132,133 @@ contract GovernorStorageV1 is GovernorProxyStorage {
         Expired,
         Executed
     }
+
 }
 
 contract GovernorStorageV2 is GovernorStorageV1 {
-    /// @notice Stores the expiration of account whitelist status as a timestamp
-    mapping (address => uint) public whitelistAccountExpirations;
 
-    /// @notice Address which manages whitelisted proposals and whitelist accounts
-    address public whitelistGuardian;
+    /// @notice ------- DEPRECATED -----------
+    /// @dev REASON: Proxy storage compatibility
+    /// @dev DO NOT REMOVE, REORDER, OR REUSE
+    mapping (address => uint) internal _whitelistExpirations;
+    /// @notice ------------------------------
+
+    /// @notice ------- DEPRECATED -----------
+    /// @dev REASON: Proxy storage compatibility
+    /// @dev DO NOT REMOVE, REORDER, OR REUSE
+    address internal _whitelistGuardian;
+    /// @notice ------------------------------
+
 }
 
+contract GovernorStorageV3 is GovernorStorageV2 {
 
-contract GovernorStorageV3 is GovernorStorageV2 {}
+    /// @notice The basis token or currency of authority 
+    IERC20 public canonicalToken;
+
+    /// @notice Flag to toggle delegation functionality
+    bool public delegationEnabled;
+
+    /// @notice The number of votes required in order for a voter to become a proposer
+    uint public proposalQuota;
+
+    /// @notice The number of votes cast required for a proposal to be considered valid
+    uint public proposalQuorum; 
+
+    /// @notice The number of votes required in order for a voter to initiate a veto proposal 
+    uint public vetoQuota;
+
+    /// @notice The number of votes cast required for a veto proposal to be considered valid
+    uint public vetoQuorum; 
+
+    /// @notice The official record of all proposals ever proposed
+    mapping (uint => ProposalV2) internal proposals;
+
+    struct ProposalV2 {
+        /// @notice Unique id for looking up a proposal
+        uint id;
+
+        /// @notice Creator of the proposal
+        address proposer;
+
+        /// @notice The timestamp that the proposal will be available for execution, set once the vote succeeds
+        uint eta;
+
+        /// @notice the ordered list of target addresses for calls to be made
+        address[] targets;
+
+        /// @notice The ordered list of values (i.e. msg.value) to be passed to the calls to be made
+        uint[] values;
+
+        /// @notice The ordered list of function signatures to be called
+        string[] signatures;
+
+        /// @notice The ordered list of calldata to be passed to each call
+        bytes[] calldatas;
+
+        /// @notice The timestamp at which voting begins
+        uint startTime;
+
+        /// @notice The timestamp at which voting end
+        uint endTime;
+
+        /// @notice The proposal voting results
+        Tally results;
+
+        /// @notice The veto proposal voting results 
+        Tally veto;
+
+        /// @notice Flag marking whether the proposal has been canceled
+        bool canceled;
+
+        /// @notice Flag marking whether the proposal has been executed
+        bool executed;
+
+        /// @notice Flag marking whether the proposal has been vetoed
+        bool contested;
+
+    }
+
+    struct Tally {
+        /// @notice Pure votes cast
+        Ballot primary;
+
+        /// @notice Virtual votes cast
+        Ballot virtualized;
+
+        /// @notice Receipts of ballots for the entire set of voters
+        mapping (address => Receipt) receipts;
+    }
+
+    struct Ballot {
+        /// @notice Current number of votes in favor of this proposal
+        uint support;
+
+        /// @notice Current number of votes in opposition to this proposal
+        uint oppose;
+
+        /// @notice Current number of votes for abstaining for this proposal
+        uint abstain;
+    }
+
+    struct Receipt {
+        /// @notice Whether or not a vote has been cast
+        bool hasVoted;
+
+        /// @notice Whether or not the voter supports the proposal or abstains
+        Option decision;
+
+        /// @notice The number of votes the voter had, which were cast
+        uint96 votes;
+
+        /// @notice The number of tokens the voter had, which were cast 
+        uint96 weight;
+    }
+
+    enum Option {
+      Oppose,
+      Support,
+      Abstain
+    }
+
+}

@@ -95,7 +95,6 @@ contract GovernorBravoDelegateStorageV1 is GovernorBravoDelegatorStorage {
     /// @notice The latest proposal for each proposer
     mapping (address => uint) public latestProposalIds;
 
-
     struct Proposal {
         /// @notice Unique id for looking up a proposal
         uint id;
