@@ -21,6 +21,9 @@ interface IGovernorDelta {
     /// @notice An event emitted when a proposal has been executed in the Timelock
     event ProposalExecuted(uint id);
 
+    /// @notice An event emitted when a proposal has been vetoed in the Timelock
+    event ProposalVetoed(uint id);
+
     /// @notice An event emitted when the voting delay is set
     event VotingDelaySet(uint oldVotingDelay, uint newVotingDelay);
 
@@ -29,9 +32,18 @@ interface IGovernorDelta {
 
     /// @notice Emitted when implementation is changed
     event NewImplementation(address oldImplementation, address newImplementation);
+    
+    /// @notice Emitted when proposal threshold is set
+    event ProposalQuorumSet(uint8 tier, uint oldProposalQuorum, uint newProposalQuorum);
 
     /// @notice Emitted when proposal threshold is set
-    event ProposalThresholdSet(uint oldProposalThreshold, uint newProposalThreshold);
+    event ProposalQuotaSet(uint oldProposalQuota, uint newProposalQuota);
+
+    /// @notice Emitted when veto threshold is set
+    event VetoQuorumSet(uint oldVetoQuorum, uint newVetoQuorum);
+
+    /// @notice Emitted when veto threshold is set
+    event VetoQuotaSet(uint oldVetoQuota, uint newVetoQuota);
 
     /// @notice Emitted when pendingAdmin is changed
     event NewPendingAdmin(address oldPendingAdmin, address newPendingAdmin);
@@ -39,9 +51,4 @@ interface IGovernorDelta {
     /// @notice Emitted when pendingAdmin is accepted, which means admin is updated
     event NewAdmin(address oldAdmin, address newAdmin);
 
-    /// @notice Emitted when whitelist account expiration is set
-    event WhitelistAccountExpirationSet(address account, uint expiration);
-
-    /// @notice Emitted when the whitelistGuardian is set
-    event WhitelistGuardianSet(address oldGuardian, address newGuardian);
 }

@@ -162,9 +162,6 @@ contract GovernorStorageV3 is GovernorStorageV2 {
     /// @notice The number of votes required in order for a voter to become a proposer
     uint public proposalQuota;
 
-    /// @notice The number of votes cast required for a proposal to be considered valid
-    uint public proposalQuorum; 
-
     /// @notice The number of votes required in order for a voter to initiate a veto proposal 
     uint public vetoQuota;
 
@@ -174,9 +171,15 @@ contract GovernorStorageV3 is GovernorStorageV2 {
     /// @notice The official record of all proposals ever proposed
     mapping (uint => ProposalV2) internal proposals;
 
+    /// @notice Graduated proposal parameters 
+    mapping(uint8 => ProposalConfig) public parameters;
+
     struct ProposalV2 {
         /// @notice Unique id for looking up a proposal
         uint id;
+
+        /// @notice Proposal severity (0,1,2,3)
+        uint8 tier;
 
         /// @notice Creator of the proposal
         address proposer;
@@ -226,39 +229,39 @@ contract GovernorStorageV3 is GovernorStorageV2 {
         /// @notice Virtual votes cast
         Ballot virtualized;
 
-        /// @notice Receipts of ballots for the entire set of voters
-        mapping (address => Receipt) receipts;
+        /// @notice Records of ballots for the entire set of voters
+        mapping (address => Record) records;
     }
 
     struct Ballot {
         /// @notice Current number of votes in favor of this proposal
-        uint support;
+        uint forVotes;
 
         /// @notice Current number of votes in opposition to this proposal
-        uint oppose;
+        uint againstVotes;
 
         /// @notice Current number of votes for abstaining for this proposal
-        uint abstain;
+        uint abstainVotes;
     }
 
-    struct Receipt {
+    struct Record {
         /// @notice Whether or not a vote has been cast
         bool hasVoted;
 
         /// @notice Whether or not the voter supports the proposal or abstains
-        Option decision;
+        uint8 decision;
 
         /// @notice The number of votes the voter had, which were cast
-        uint96 votes;
+        uint96 power;
 
         /// @notice The number of tokens the voter had, which were cast 
         uint96 weight;
     }
 
-    enum Option {
-      Oppose,
-      Support,
-      Abstain
+    struct ProposalConfig {
+        uint256 quorum;
+        uint256 duration;
     }
 
 }
+
