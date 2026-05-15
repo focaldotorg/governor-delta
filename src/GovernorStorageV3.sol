@@ -3,6 +3,7 @@ pragma solidity ^0.8.10;
 
 import "@interfaces/ITimelock.sol";
 import "@interfaces/IERC20.sol";
+import "@interfaces/IVotingStrategy.sol";
 
 contract GovernorProxyStorage {
     /// @notice Administrator for this contract
@@ -156,6 +157,9 @@ contract GovernorStorageV3 is GovernorStorageV2 {
     /// @notice The basis token or currency of authority 
     IERC20 public canonicalToken;
 
+    /// @notice The basis token or currency of authority 
+    IVotingStrategy public votingModule;
+
     /// @notice Flag to toggle delegation functionality
     bool public delegationEnabled;
 
@@ -222,6 +226,7 @@ contract GovernorStorageV3 is GovernorStorageV2 {
 
     }
 
+    /// @notice Proposal configuration 
     struct Tally {
         /// @notice Pure votes cast
         Ballot primary;
@@ -233,6 +238,7 @@ contract GovernorStorageV3 is GovernorStorageV2 {
         mapping (address => Record) records;
     }
 
+    /// @notice Proposal vote record
     struct Ballot {
         /// @notice Current number of votes in favor of this proposal
         uint forVotes;
@@ -244,6 +250,7 @@ contract GovernorStorageV3 is GovernorStorageV2 {
         uint abstainVotes;
     }
 
+    /// @notice Proposal voter record
     struct Record {
         /// @notice Whether or not a vote has been cast
         bool hasVoted;
@@ -258,8 +265,11 @@ contract GovernorStorageV3 is GovernorStorageV2 {
         uint96 weight;
     }
 
+    /// @notice Proposal configuration 
     struct Graduated {
+        /// @notice The minimum number of votes of a proposal required for a proposal to be valid
         uint256 quorum;
+        /// @notice The duration of which a proposal will be active for voting
         uint256 duration;
     }
 

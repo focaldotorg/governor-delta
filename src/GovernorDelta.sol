@@ -72,6 +72,7 @@ contract GovernorDelta is GovernorStorageV3, IGovernorDelta {
 
         timelock = ITimelock(timelock_);
         canonicalToken = IERC20(token_);
+        votingModule = IVotingStrategy(address(new WeightedVotingStrategy(token_)));
 
         _setVotingPeriod(votingPeriod_);
         _setVotingDelay(votingDelay_);
