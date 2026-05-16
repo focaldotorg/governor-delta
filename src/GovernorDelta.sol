@@ -104,6 +104,56 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
     }
 
     /**
+      * @notice Gets the status of a proposal
+      * @param proposalId The id of the proposal
+      * @return Proposal status 
+    **/
+    function status(uint256 proposalId) public view returns (ProposalStatus) {
+        Proposal storage proposal = proposals[proposalId];
+        ProposalState s = state(proposalId);
+        uint quorumVotes = proposalConfig[proposal.tier].quorum;
+
+        if (s == ProposalState.Canceled || s == ProposalState.Defeated || s == ProposalState.Expired || s == ProposalState.Executed) { 
+          return ProposalStatus.Resolved;
+        } else if (proposal.contested) {
+          return ProposalStatus.Contested;
+        } else if (proposal.results.primary.totalWeight >= quorumVotes) {
+          return ProposalStatus.Qualified;
+        } else {
+          return ProposalStatus.Unqualified;
+        }
+    }
+
+    /**
+      * @notice Gets the state of a proposal
+      * @param proposalId The id of the proposal
+      * @return Proposal state
+    **/
+    function state(uint proposalId) public view returns (ProposalState, ProposalStatus) {
+        require(proposalCount >= proposalId && proposalId > initialProposalId, "GovernorBravo::state: invalid proposal id");
+        Proposal storage proposal = proposals[proposalId];
+        uint quorumVotes = proposalConfig[proposal.tier].quorum;
+
+        if (proposal.canceled) {
+            return ProposalState.Canceled;
+        } else if (block.number <= proposal.startBlock) {
+            return ProposalState.Pending;
+        } else if (block.number <= proposal.endBlock) {
+            return ProposalState.Active;
+        } else if (proposal.results.priamry.forVotes <= proposal.results.primary.againstVotes) {
+            return ProposalState.Defeated;
+        } else if (proposal.eta == 0) {
+            return ProposalState.Succeeded;
+        } else if (proposal.executed) {
+            return ProposalState.Executed;
+        } else if (block.timestamp >= add256(proposal.eta, timelock.GRACE_PERIOD())) {
+            return ProposalState.Expired;
+        } else {
+            return ProposalState.Queued;
+        }
+    }
+
+    /**
       * @notice Locks canonical tokens into the governor to accrue voting weight
       * @param amount The amount of canonical tokens to lock
     **/

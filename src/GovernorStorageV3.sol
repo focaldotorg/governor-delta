@@ -313,5 +313,12 @@ contract GovernorStorageV3 is GovernorEvents, GovernorStorageV2 {
         uint256 duration;
     }
 
-}
+    /// @notice Possible states that a proposal may be in
+    enum ProposalStatus {
+        Unqualified,
+        Qualified, 
+        Contested, 
+        Resolved 
+    }
 
+}
