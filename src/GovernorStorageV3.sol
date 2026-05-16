@@ -197,9 +197,11 @@ contract GovernorStorageV3 is GovernorEvents, GovernorStorageV2 {
     struct Stake {
         /// @notice Total canonical tokens currently locked by the stakeholder
         uint amount;
-        /// @notice The timestamp of the stakeholder's last attested ballot
+        /// @notice The timestamp of the stakeholders last attested action
         uint unlockTime;
-        /// @notice Timestamp of the last stake state change, used to settle accumulator values
+        /// @notice The timestamp of the stakeholder last voted proposals resolution
+        uint commitTime;
+        /// @notice The timestamp of the last stake state change, used to settle accumulator values
         uint lastUpdateTime;
         /// @notice Running sum of stake amount multiplied by time elapsed 
         uint deltaAmountTime;
