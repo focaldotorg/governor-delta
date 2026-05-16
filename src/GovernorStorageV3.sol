@@ -6,6 +6,7 @@ import "@interfaces/IERC20.sol";
 import "@interfaces/IVotingStrategy.sol";
 
 contract GovernorProxyStorage {
+
     /// @notice Administrator for this contract
     address public admin;
 
@@ -14,6 +15,7 @@ contract GovernorProxyStorage {
 
     /// @notice Active brains of Governor
     address public implementation;
+
 }
 
 /**
@@ -192,7 +194,7 @@ contract GovernorStorageV3 is GovernorEvents, GovernorStorageV2 {
         /// @notice Total canonical tokens currently locked by the stakeholder
         uint amount;
         /// @notice The timestamp of the stakeholder's last attested ballot
-        uint lastVoteTime;
+        uint unlockTime;
         /// @notice Timestamp of the last stake state change, used to settle accumulator values
         uint lastUpdateTime;
         /// @notice Running sum of stake amount multiplied by time elapsed 

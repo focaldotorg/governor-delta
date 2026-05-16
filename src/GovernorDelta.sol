@@ -125,7 +125,7 @@ contract GovernorDelta is GovernorStorageV3 {
         Stake storage s = stake[msg.sender];
         require(amount > 0, "GovernorDelta::withdraw: invalid amount");
         require(amount <= s.amount, "GovernorDelta::withdraw: insufficient balance");
-        require(block.timestamp > s.lastVoteTime, "GovernorDelta::withdraw: active vote");
+        require(s.unlockTime < block.timestamp, "GovernorDelta::withdraw: active vote or delegation");
         uint256 deltaTime = block.timestamp - s.lastUpdateTime;
         s.deltaAmountTime += s.amount * deltaTime;
         s.lastUpdateTime = block.timestamp;
@@ -134,6 +134,47 @@ contract GovernorDelta is GovernorStorageV3 {
         canonicalToken.transfer(msg.sender, amount);
 
         emit Unlocked(msg.sender, address(canonicalToken), amount);
+    }
+
+    /**
+      * @notice Delegates voting power to another account
+      * @dev A delegator may only hold one active delegation at a time
+      * @param delegatee The address to delegate voting power to
+      * @param expiry The timestamp at which the delegation expires
+      * @return id The delegation identifier 
+    **/
+    function delegate(address delegatee, uint256 expiry) external returns (bytes32) {
+        Stake storage s = stakes[msg.sender];
+        require(delegatee != address(0), "GovernorDelta::delegate: invalid delegatee");
+        require(expiry > block.timestamp, "GovernorDelta::delegate: invalid expiry");
+        require(s.unlockTime < block.timestamp, "GovernorDelta::delegate: vote already assigned");
+        require(delegations[msg.sender].target == address(0), "GovernorDelta::delegate: active delegation");
+        require(s.amount > 0, "GovernorDelta::delegate: no stake");
+        bytes32 id = keccak256(abi.encode(msg.sender, delegatee, expiry));
+        delegations[msg.sender] = Delegate({ target: delegatee, expiry: expiry });
+        s.unlockTime = expiry;
+
+        emit Delegate(msg.sender, delegatee, id);
+
+        return id;
+    }
+
+    /**
+      * @notice Revokes an active delegation
+      * @dev Delegation identifier is recomputed from stored parameters 
+    **/
+    function revoke() external {
+        Delegate storage d = delegations[msg.sender];
+        require(d.target != address(0), "GovernorDelta::revoke: no active delegation");
+        require(d.expiry > block.timestamp, "GovernorDelta::revoke: delegation already expired");
+        bytes32 id = keccak256(abi.encode(msg.sender, d.target, d.expiry));
+        uint256 timeRemaining = d.expiry - block.timestamp;
+        address delegate = d.target;
+        stakes[msg.sender].unlockTime = block.timestamp;
+
+        delete delegations[msg.sender];
+
+        emit Revoke(msg.sender, delegate, id, timeRemaining);
     }
 
     /**
@@ -244,10 +285,10 @@ contract GovernorDelta is GovernorStorageV3 {
     /// @notice Emitted when pendingAdmin is accepted, which means admin is updated
     event NewAdmin(address oldAdmin, address newAdmin);
 
-    /// @notice An event thats emitted when an account changes its delegate
-    event DelegateChanged(address indexed delegator, address indexed fromDelegate, address indexed toDelegate);
+    /// @notice Emitted when an account changes a delegate
+    event Delegate(address indexed delegator, address indexed delegate, bytes32 indexed id);
 
-    /// @notice An event thats emitted when a delegate account's vote balance changes
-    event DelegateVotesChanged(address indexed delegate, uint previousBalance, uint newBalance);
+    /// @notice Emitted when an account revokes a delegate 
+    event Revoke(address indexed delegator, address indexed delegate, bytes32 indexed id, uint timeUntilExpiry);
 
 }
