@@ -29,8 +29,12 @@ contract GovernorStorageV1 is GovernorProxyStorage {
     /// @notice The delay before voting on a proposal may take place, once proposed, in blocks
     uint public votingDelay;
 
-    /// @notice The duration of voting on a proposal, in blocks
-    uint public votingPeriod;
+    /// @notice ------- DEPRECATED -----------
+    /// @dev REASON: Proxy storage compatibility
+    /// @dev NOTE: Superseded by `Graduated`
+    /// @dev DO NOT REMOVE, REORDER, OR REUSE
+    uint public _votingPeriod;
+    /// @notice ------------------------------
 
     /// @notice ------- DEPRECATED -----------
     /// @dev REASON: Proxy storage compatibility
