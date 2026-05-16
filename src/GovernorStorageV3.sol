@@ -40,7 +40,7 @@ contract GovernorStorageV1 is GovernorProxyStorage {
     /// @dev REASON: Proxy storage compatibility
     /// @dev NOTE: Superseded by `proposalQuota`
     /// @dev DO NOT REMOVE, REORDER, OR REUSE
-    IGovernorToken internal _proposalThreshold;
+    uint internal _proposalThreshold;
     /// @notice ------------------------------
 
     /// @notice Initial proposal id set at become
@@ -167,7 +167,7 @@ contract GovernorStorageV3 is GovernorEvents, GovernorStorageV2 {
     IVotingStrategy public votingModule;
 
     /// @notice Flag to toggle delegation functionality
-    bool public delegationEnabled;
+    bool public allowDelegation;
 
     /// @notice The number of votes required in order for a voter to become a proposer
     uint public proposalQuota;
@@ -270,9 +270,6 @@ contract GovernorStorageV3 is GovernorEvents, GovernorStorageV2 {
 
         /// @notice Virtual votes cast
         Ballot virtualized;
-
-        /// @notice Records of ballots for the entire set of voters
-        mapping (address => Record) records;
     }
 
     /// @notice Proposal vote record
@@ -288,6 +285,9 @@ contract GovernorStorageV3 is GovernorEvents, GovernorStorageV2 {
 
         /// @notice Current number of tokens participating in this proposal
         uint totalWeight;
+
+        /// @notice Records of ballots for the entire set of voters
+        mapping (address => Record) records;
     }
 
     /// @notice Proposal voter record

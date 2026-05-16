@@ -77,16 +77,16 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         require(token_ != address(0), "GovernorDelta::initialize: invalid canonical token address");
         require(votingDelay_ >= MIN_VOTING_DELAY && votingDelay_ <= MAX_VOTING_DELAY, "GovernorDelta:: invalid voting delay");
 
+        votingDelay = votingDelay_;
+        proposalQuota = proposalQuota_;
         timelock = ITimelock(timelock_);
         canonicalToken = IERC20(token_);
-        votingModule = IVotingStrategy(address(new WeightedVotingStrategy(address(this))));
         proposalConfig[0] = Graduated({ quorum: DEFAULT_TIER_0_QUORUM, duration: DEFAULT_TIER_0_DURATION });
         proposalConfig[1] = Graduated({ quorum: DEFAULT_TIER_1_QUORUM, duration: DEFAULT_TIER_1_DURATION });
         proposalConfig[2] = Graduated({ quorum: DEFAULT_TIER_2_QUORUM, duration: DEFAULT_TIER_2_DURATION });
         proposalConfig[3] = Graduated({ quorum: DEFAULT_TIER_3_QUORUM, duration: DEFAULT_TIER_3_DURATION });
 
-        votingDelay = votingDelay_;
-        proposalQuota = proposalQuota_;
+        votingModule = IVotingStrategy(address(new WeightedVotingStrategy(address(this))));
     }
 
     /**
@@ -100,7 +100,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
             Stake storage s = stakes[owner];
             return (s.amount, s.deltaAmountTime);
         }
-        return (0,0);
+        return (0, 0);
     }
 
     /**
