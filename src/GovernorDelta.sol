@@ -12,7 +12,10 @@ contract GovernorDelta is GovernorStorageV3 {
     uint public constant MIN_VOTING_PERIOD = 3 days;
 
     /// @notice The max setable voting period
-    uint public constant MAX_VOTING_PERIOD = 100 days; 
+    uint public constant MAX_VOTING_PERIOD = 100 days;
+
+    /// @notice The max delegation period
+    uint public constant MAX_DELEGATION_PERIOD = 1 year;
 
     /// @notice The min setable voting delay 
     uint public constant MIN_VOTING_DELAY = 2 days;
@@ -24,7 +27,7 @@ contract GovernorDelta is GovernorStorageV3 {
     uint public constant MIN_QUORUM_VOTES = 400000e18; 
 
     /// @notice The maximum number of actions that can be included in a proposal
-    uint public constant proposalMaxOperations = 10; 
+    uint public constant MAX_PROPOSAL_OPERATIONS = 10; 
 
     /// @notice Proposal tier 0 (low) minimum canonical weight
     uint public constant DEFAULT_TIER_0_QUORUM = 10000e18;
@@ -144,9 +147,10 @@ contract GovernorDelta is GovernorStorageV3 {
     function delegate(address delegatee, uint256 expiry) external returns (bytes32 id) {
         Stake storage s = stakes[msg.sender];
         require(delegatee != address(0), "GovernorDelta::delegate: invalid delegatee");
-        require(expiry > block.timestamp, "GovernorDelta::delegate: invalid expiry");
-        require(s.unlockTime < block.timestamp, "GovernorDelta::delegate: vote already assigned");
+        require(expiry > block.timestamp, "GovernorDelta::delegate: insufficient expiry");
+        require(expiry - block.timestamp <= MAX_DELEGATION_PERIOD, "GovernorDelta::delegate: invalid expiry");
         require(delegations[msg.sender].target == address(0), "GovernorDelta::delegate: active delegation");
+        require(s.unlockTime < block.timestamp, "GovernorDelta::delegate: vote already assigned");
         require(s.amount > 0, "GovernorDelta::delegate: no stake");
         id = keccak256(abi.encode(msg.sender, delegatee, expiry));
 
@@ -162,7 +166,9 @@ contract GovernorDelta is GovernorStorageV3 {
     **/
     function redelegate(address delegatee, uint256 expiry) external returns (bytes32 id) {
         require(delegatee != address(0), "GovernorDelta::redelegate: invalid delegatee");
-        require(delegations[msg.sender].expiry <= block.timestamp, "GovernorDelta::redelegate: active delegation, revoke first");
+        require(expiry > block.timestamp, "GovernorDelta::delegate: insufficient expiry");
+        require(expiry - block.timestamp <= MAX_DELEGATION_PERIOD, "GovernorDelta::delegate: invalid expiry");
+        require(delegations[msg.sender].expiry <= block.timestamp, "GovernorDelta::redelegate: active delegation");
         id = keccak256(abi.encode(msg.sender, delegatee, expiry));
 
         _moveDelegates(msg.sender, delegatee, expiry);
