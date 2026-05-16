@@ -79,7 +79,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
 
         timelock = ITimelock(timelock_);
         canonicalToken = IERC20(token_);
-        votingModule = IVotingStrategy(address(new WeightedVotingStrategy(token_)));
+        votingModule = IVotingStrategy(address(new WeightedVotingStrategy(address(this))));
         proposalConfig[0] = Graduated({ quorum: DEFAULT_TIER_0_QUORUM, duration: DEFAULT_TIER_0_DURATION });
         proposalConfig[1] = Graduated({ quorum: DEFAULT_TIER_1_QUORUM, duration: DEFAULT_TIER_1_DURATION });
         proposalConfig[2] = Graduated({ quorum: DEFAULT_TIER_2_QUORUM, duration: DEFAULT_TIER_2_DURATION });
