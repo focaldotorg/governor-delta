@@ -109,15 +109,15 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @return Proposal status 
     **/
     function status(uint256 proposalId) public view returns (ProposalStatus) {
-        Proposal storage proposal = proposals[proposalId];
+        Proposal storage p = proposals[proposalId];
         ProposalState s = state(proposalId);
         uint quorumVotes = proposalConfig[proposal.tier].quorum;
 
         if (s == ProposalState.Canceled || s == ProposalState.Defeated || s == ProposalState.Expired || s == ProposalState.Executed) { 
           return ProposalStatus.Resolved;
-        } else if (proposal.contested) {
+        } else if (p.contested) {
           return ProposalStatus.Contested;
-        } else if (proposal.results.primary.totalWeight >= quorumVotes) {
+        } else if (p.results.primary.totalWeight >= quorumVotes) {
           return ProposalStatus.Qualified;
         } else {
           return ProposalStatus.Unqualified;
@@ -131,22 +131,22 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
     **/
     function state(uint proposalId) public view returns (ProposalState, ProposalStatus) {
         require(proposalCount >= proposalId && proposalId > initialProposalId, "GovernorBravo::state: invalid proposal id");
-        Proposal storage proposal = proposals[proposalId];
+        Proposal storage p = proposals[proposalId];
         uint quorumVotes = proposalConfig[proposal.tier].quorum;
 
-        if (proposal.canceled) {
+        if (p.canceled) {
             return ProposalState.Canceled;
-        } else if (block.number <= proposal.startBlock) {
+        } else if (block.timestamp <= p.startTime) {
             return ProposalState.Pending;
-        } else if (block.number <= proposal.endBlock) {
+        } else if (block.timestamp <= p.endTime) {
             return ProposalState.Active;
-        } else if (proposal.results.priamry.forVotes <= proposal.results.primary.againstVotes) {
+        } else if (p.results.primary.forVotes <= p.results.primary.againstVotes || p.results.primary.totalWeight < quorumVotes) {
             return ProposalState.Defeated;
-        } else if (proposal.eta == 0) {
+        } else if (p.eta == 0) {
             return ProposalState.Succeeded;
-        } else if (proposal.executed) {
+        } else if (p.executed) {
             return ProposalState.Executed;
-        } else if (block.timestamp >= add256(proposal.eta, timelock.GRACE_PERIOD())) {
+        } else if (block.timestamp >= add256(p.eta, timelock.GRACE_PERIOD())) {
             return ProposalState.Expired;
         } else {
             return ProposalState.Queued;
