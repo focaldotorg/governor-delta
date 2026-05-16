@@ -152,7 +152,7 @@ contract GovernorStorageV2 is GovernorStorageV1 {
 
 }
 
-contract GovernorStorageV3 is GovernorStorageV2 {
+contract GovernorStorageV3 is GovernorEvents, GovernorStorageV2 {
 
     /// @notice The basis token or currency of authority 
     IERC20 public canonicalToken;
