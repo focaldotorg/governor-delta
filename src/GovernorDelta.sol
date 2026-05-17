@@ -104,6 +104,31 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
     }
 
     /**
+      * @notice Gets actions of a proposal
+      * @param proposalId the id of the proposal
+      * @return Targets, values, signatures, and calldatas of the proposal actions
+      */
+    function getActions(uint proposalId) external view returns (address[] memory targets, uint[] memory values, string[] memory signatures, bytes[] memory calldatas) {
+        Proposal storage p = proposals[proposalId];
+        return (p.targets, p.values, p.signatures, p.calldatas);
+    }
+
+    /**
+      * @notice Gets the receipt for a voter on a given proposal
+      * @param proposalId the id of proposal
+      * @param voter The address of the voter
+      * @return The voting records 
+      */
+    function getRecords(uint proposalId, address voter, bool virtualized) external view returns (Receipt[4] memory) {
+        return ( 
+          proposals[proposalId].result.primary.records[voter],
+          proposals[proposalId].result.virtualized.records[voter], 
+          proposals[proposalId].veto.primary.records[voter],
+          proposals[proposalId].veto.virtualized.records[voter]
+        ); 
+    }
+
+    /**
       * @notice Gets the status of a proposal
       * @param proposalId The id of the proposal
       * @return Proposal status 
