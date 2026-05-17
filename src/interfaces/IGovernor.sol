@@ -64,4 +64,7 @@ interface IGovernor {
     /// @notice Emitted when an account revokes a delegate 
     event Revoke(address indexed delegator, address indexed delegate, bytes32 indexed id, uint timeUntilExpiry);
 
+    /// @notice Emitted when votingModule is changed
+    event NewVotingModule(address oldModule, address newModule);
+
 }

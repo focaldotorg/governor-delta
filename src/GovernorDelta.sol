@@ -294,4 +294,13 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         }
     }
 
+
+    function _setVotingModule(address strategy) external {
+        require(msg.sender == admin, "GovernorDelta::_setVotingModule: admin only");
+        address previousModule = address(votingModule)
+        votingModule = IVotingStrategy(strategy);
+
+        emit NewVotingModule(previousModule, votingModule);
+    }
+
 }
