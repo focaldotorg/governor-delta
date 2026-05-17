@@ -294,13 +294,41 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         }
     }
 
-
     function _setVotingModule(address strategy) external {
         require(msg.sender == admin, "GovernorDelta::_setVotingModule: admin only");
         address previousModule = address(votingModule)
         votingModule = IVotingStrategy(strategy);
 
         emit NewVotingModule(previousModule, votingModule);
+    }
+
+
+    /**
+      * @notice Begins transfer of admin rights. The newPendingAdmin must call `_acceptAdmin` to finalize the transfer.
+      * @dev Admin function to begin change of admin. The newPendingAdmin must call `_acceptAdmin` to finalize the transfer.
+      * @param newPendingAdmin New pending admin.
+      */
+    function _setPendingAdmin(address newPendingAdmin) external {
+        require(msg.sender == admin, "GovernorBravo:_setPendingAdmin: admin only");
+        address oldPendingAdmin = pendingAdmin;
+        pendingAdmin = newPendingAdmin;
+
+        emit NewPendingAdmin(oldPendingAdmin, newPendingAdmin);
+    }
+
+    /**
+      * @notice Accepts transfer of admin rights. msg.sender must be pendingAdmin
+      * @dev Admin function for pending admin to accept role and update admin
+      */
+    function _acceptAdmin() external {
+        require(msg.sender == pendingAdmin && msg.sender != address(0), "GovernorBravo:_acceptAdmin: pending admin only");
+        address oldAdmin = admin;
+        address oldPendingAdmin = pendingAdmin;
+        admin = pendingAdmin;
+        pendingAdmin = address(0);
+
+        emit NewAdmin(oldAdmin, admin);
+        emit NewPendingAdmin(oldPendingAdmin, pendingAdmin);
     }
 
 }
