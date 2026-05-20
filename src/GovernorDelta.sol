@@ -90,6 +90,19 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         votingModule = IVotingStrategy(address(new WeightedVotingStrategy(address(this))));
     }
 
+    /**
+      * @notice Returns the stake of a given account
+      * @param owner The address of the stakeholder
+      * @return amount The total amount of tokens staked
+      * @return deltaAmountTime Capital-weighted time coefficient
+    **/
+    function stake(address owner) public view returns (uint, uint) {
+        if (delegations[owner].target == address(0)) {
+            Stake storage s = stakes[owner];
+            return (s.amount, s.deltaAmountTime);
+        }
+        return (0, 0);
+    }
 
     /**
       * @notice Returns the total voting power of a given account
@@ -116,24 +129,10 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
     }
 
     /**
-      * @notice Returns the stake of a given account
-      * @param owner The address of the stakeholder
-      * @return amount The total amount of tokens staked
-      * @return deltaAmountTime Capital-weighted time coefficient
-    **/
-    function stake(address owner) public view returns (uint, uint) {
-        if (delegations[owner].target == address(0)) {
-            Stake storage s = stakes[owner];
-            return (s.amount, s.deltaAmountTime);
-        }
-        return (0, 0);
-    }
-
-    /**
       * @notice Gets actions of a proposal
       * @param proposalId the id of the proposal
       * @return Targets, values, signatures, and calldatas of the proposal actions
-      */
+    **/
     function getActions(uint proposalId) external view returns (address[] memory targets, uint[] memory values, string[] memory signatures, bytes[] memory calldatas) {
         Proposal storage p = proposals[proposalId];
         return (p.targets, p.values, p.signatures, p.calldatas);
@@ -146,12 +145,23 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @return The voting records 
       */
     function getRecords(uint proposalId, address voter, bool virtualized) external view returns (Receipt[4] memory) {
+        Proposal storage p = proposals[proposalId];
+
         return ( 
-          proposals[proposalId].result.primary.records[voter],
-          proposals[proposalId].result.virtualized.records[voter], 
-          proposals[proposalId].veto.primary.records[voter],
-          proposals[proposalId].veto.virtualized.records[voter]
+          p.results.primary.records[voter],
+          p.results.virtualized.records[voter], 
+          p.veto.primary.records[voter],
+          p.veto.virtualized.records[voter]
         ); 
+    }
+
+    /**
+      * @notice Checks whether a delegation is valid 
+      * @param id The delegation identifier
+      * @return Delegation confirmation stateo
+    **/
+    function checkDelegationByHash(bytes32 id) public view returns (bool) {
+        return _checkDelegationHash(id);
     }
 
     /**
@@ -293,27 +303,6 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         emit Revoke(msg.sender, delegatee, id, timeRemaining);
     }
 
-    function checkDelegationByHash(bytes32 id) public view returns (bool) {
-        (address delegator, address delegatee, uint256 expiry) = abi.decode(encoded, (address, address, uint256));
-        Delegate storage d = delegations[delegator];
-
-        if ( d.expiry < block.timestamp) {
-            return d.expiry == expiry && d.target === delegatee;
-        } 
-        return false 
-    }
-
-    function _moveDelegates(address delegator, address delegatee, uint256 expiry) internal {
-        if (delegator != delegatee) {
-          delegations[delegator] = Delegate({ target: delegatee, expiry: expiry });
-          stakes[delegator].unlockTime = expiry;
-        } else {
-          delete delegations[delegator];
-
-          stakes[delegator].unlockTime = block.timestamp;
-        }
-    } 
-
     /**
       * @notice Admin function for setting the voting delay
       * @param newVotingDelay Wew voting delay as a timestamp 
@@ -363,9 +352,8 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         emit NewVotingModule(previousModule, votingModule);
     }
 
-
     /**
-      * @notice Initiate the GovernorBravo contract
+      * @notice Initiate the GovernorDelta contract
       * @dev Admin only. Sets initial proposal id which initiates the contract, ensuring a continuous proposal id count
       * @param governorAlpha The address for the Governor to continue the proposal id count from
     **/
@@ -404,5 +392,26 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         emit NewAdmin(oldAdmin, admin);
         emit NewPendingAdmin(oldPendingAdmin, pendingAdmin);
     }
+
+    function _checkDelegationHash(bytes32 id) internal returns (bool) {
+        (address delegator, address delegatee, uint256 expiry) = abi.decode(encoded, (address, address, uint256));
+        Delegate storage d = delegations[delegator];
+
+        if ( d.expiry < block.timestamp) {
+            return d.expiry == expiry && d.target === delegatee;
+        } 
+        return false; 
+    }
+
+    function _moveDelegates(address delegator, address delegatee, uint256 expiry) internal {
+        if (delegator != delegatee) {
+          delegations[delegator] = Delegate({ target: delegatee, expiry: expiry });
+          stakes[delegator].unlockTime = expiry;
+        } else {
+          delete delegations[delegator];
+
+          stakes[delegator].unlockTime = block.timestamp;
+        }
+    } 
 
 }
