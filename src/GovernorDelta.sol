@@ -293,6 +293,16 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         emit Revoke(msg.sender, delegatee, id, timeRemaining);
     }
 
+    function checkDelegationByHash(bytes32 id) public view returns (bool) {
+        (address delegator, address delegatee, uint256 expiry) = abi.decode(encoded, (address, address, uint256));
+        Delegate storage d = delegations[delegator];
+
+        if ( d.expiry < block.timestamp) {
+            return d.expiry == expiry && d.target === delegatee;
+        } 
+        return false 
+    }
+
     function _moveDelegates(address delegator, address delegatee, uint256 expiry) internal {
         if (delegator != delegatee) {
           delegations[delegator] = Delegate({ target: delegatee, expiry: expiry });
