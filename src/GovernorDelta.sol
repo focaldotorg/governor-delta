@@ -281,7 +281,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
     /**
       * @notice Admin function for setting the voting delay
       * @param newVotingDelay Wew voting delay as a timestamp 
-    */
+    **/
     function _setVotingDelay(uint newVotingDelay) external {
         require(msg.sender == admin, "GovernorDelta::_setVotingDelay: admin only");
         require(newVotingDelay >= MIN_VOTING_DELAY && newVotingDelay <= MAX_VOTING_DELAY, "GovernorDelta::_setVotingDelay: invalid voting delay");
@@ -295,7 +295,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @notice Admin function for setting the proposal threshold
       * @dev newProposalThreshold must be greater than the hardcoded min
       * @param newProposalThreshold new proposal threshold
-    */
+    **/
     function _setProposalQuota(uint newProposalThreshold) external {
         require(msg.sender == admin, "GovernorDelta::_setProposalThreshold: admin only");
         uint oldProposalThreshold = proposalThreshold;
@@ -308,7 +308,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
      * @notice Sets the proposal configuration for all tiers
      * @dev Tier 0 (low) to tier 3 (critical), each with independent quorum and duration
      * @param configs Fixed array of four tier configurations, ordered by severity ascending
-     */
+    **/
     function _setProposalConfig(Graduated[4] memory configs) external {
         require(msg.sender == admin, "GovernorDelta::_setProposalConfig: admin only");
 
@@ -329,10 +329,23 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
 
 
     /**
+      * @notice Initiate the GovernorBravo contract
+      * @dev Admin only. Sets initial proposal id which initiates the contract, ensuring a continuous proposal id count
+      * @param governorAlpha The address for the Governor to continue the proposal id count from
+    **/
+    function _initiate(address governor) external {
+        require(msg.sender == admin, "GovernorBravo::_initiate: admin only");
+        require(initialProposalId == 0, "GovernorBravo::_initiate: can only initiate once");
+        proposalCount = GovernorAlpha(governor).proposalCount();
+        initialProposalId = proposalCount;
+        timelock.acceptAdmin();
+    }
+
+    /**
       * @notice Begins transfer of admin rights. The newPendingAdmin must call `_acceptAdmin` to finalize the transfer.
       * @dev Admin function to begin change of admin. The newPendingAdmin must call `_acceptAdmin` to finalize the transfer.
       * @param newPendingAdmin New pending admin.
-      */
+    **/
     function _setPendingAdmin(address newPendingAdmin) external {
         require(msg.sender == admin, "GovernorBravo:_setPendingAdmin: admin only");
         address oldPendingAdmin = pendingAdmin;
@@ -344,7 +357,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
     /**
       * @notice Accepts transfer of admin rights. msg.sender must be pendingAdmin
       * @dev Admin function for pending admin to accept role and update admin
-      */
+    **/
     function _acceptAdmin() external {
         require(msg.sender == pendingAdmin && msg.sender != address(0), "GovernorBravo:_acceptAdmin: pending admin only");
         address oldAdmin = admin;
