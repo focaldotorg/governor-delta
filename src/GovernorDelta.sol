@@ -1,6 +1,7 @@
 pragma solidity ^0.8.10;
 
 import "@interfaces/IGovernor.sol";
+import "@interfaces/IGovernorAlpha.sol";
 import "GovernorStorageV3.sol";
 
 contract GovernorDelta is IGovernor, GovernorStorageV3 {
@@ -87,6 +88,31 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         proposalConfig[3] = Graduated({ quorum: DEFAULT_TIER_3_QUORUM, duration: DEFAULT_TIER_3_DURATION });
 
         votingModule = IVotingStrategy(address(new WeightedVotingStrategy(address(this))));
+    }
+
+
+    /**
+      * @notice Returns the total voting power of a given account
+      * @param owner The address to query voting power for
+      * @return The voting power of the account as determined by the voting module
+    **/
+    function votingPower(address owner) public view returns (uint) {
+       return votingModule.power(owner);
+    }
+
+    /**
+      * @notice Returns the voting power delegated to an account by a specific delegator
+      * @param owner The address receiving the delegation
+      * @param delegator The address that has delegated their voting power
+      * @return The delegated voting power if an active delegation exists, otherwise zero
+    **/
+    function delegatedPower(address owner, address delegator) public view returns (uint) {
+      Delegate storage d = delegations[delegator];
+
+      if (d.target == owner && d.expiry < block.timestamp) {
+          return votingModule.power(delegator);
+      }
+      return 0;
     }
 
     /**
@@ -334,8 +360,8 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @param governorAlpha The address for the Governor to continue the proposal id count from
     **/
     function _initiate(address governor) external {
-        require(msg.sender == admin, "GovernorBravo::_initiate: admin only");
-        require(initialProposalId == 0, "GovernorBravo::_initiate: can only initiate once");
+        require(msg.sender == admin, "GovernorDelta::_initiate: admin only");
+        require(initialProposalId == 0, "GovernorDelta::_initiate: can only initiate once");
         proposalCount = GovernorAlpha(governor).proposalCount();
         initialProposalId = proposalCount;
         timelock.acceptAdmin();
@@ -347,7 +373,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @param newPendingAdmin New pending admin.
     **/
     function _setPendingAdmin(address newPendingAdmin) external {
-        require(msg.sender == admin, "GovernorBravo:_setPendingAdmin: admin only");
+        require(msg.sender == admin, "GovernorDelta:_setPendingAdmin: admin only");
         address oldPendingAdmin = pendingAdmin;
         pendingAdmin = newPendingAdmin;
 
@@ -359,7 +385,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @dev Admin function for pending admin to accept role and update admin
     **/
     function _acceptAdmin() external {
-        require(msg.sender == pendingAdmin && msg.sender != address(0), "GovernorBravo:_acceptAdmin: pending admin only");
+        require(msg.sender == pendingAdmin && msg.sender != address(0), "GovernorDelta:_acceptAdmin: pending admin only");
         address oldAdmin = admin;
         address oldPendingAdmin = pendingAdmin;
         admin = pendingAdmin;
