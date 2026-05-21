@@ -14,12 +14,19 @@ contract WeightedVotingStrategy is IVotingStrategy {
         return false;
     }
 
-    function power(address owner) public view returns (uint amount) {
-        (amount,) = governor.stake(owner);
+    function power(address owner) public view returns (uint) {
+        (uint balance,) = governor.stake(owner);
+        return balance;
     }
 
-    function weight(address owner) public view returns (uint amount) {
-        (amount,) = governor.stake(owner);
+    function weight(address owner) public view returns (uint) {
+        (uint balance,) = governor.stake(owner);
+        return balance;
+    }
+
+    function predict(address owner, uint timestamp) public view returns (uint) {
+        (uint balance,) = governor.stake(owner);
+        return balance;
     }
 
     function reduce(bytes32[] memory attestations) external returns (bool) { }

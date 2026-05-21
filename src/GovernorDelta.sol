@@ -105,27 +105,52 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
     }
 
     /**
-      * @notice Returns the total voting power of a given account
+      * @notice Returns the current voting power of a given account
       * @param owner The address to query voting power for
-      * @return The voting power of the account as determined by the voting module
+      * @return The voting power of the account 
     **/
     function votingPower(address owner) public view returns (uint) {
-       return votingModule.power(owner);
+        return votingModule.power(owner);
     }
 
     /**
-      * @notice Returns the voting power delegated to an account by a specific delegator
+      * @notice Returns the future voting power of a given account 
+      * @param owner The address to query voting power for
+      * @return The future voting power of the account 
+    **/
+    function predictedPower(address owner, uint timestamp) public view returns (uint) {
+        return votingModule.predict(owner, timestamp);
+    }
+
+    /**
+      * @notice Returns the current delegated voting power of a given account 
       * @param owner The address receiving the delegation
       * @param delegator The address that has delegated their voting power
-      * @return The delegated voting power if an active delegation exists, otherwise zero
+      * @return The delegated voting power of the account
     **/
     function delegatedPower(address owner, address delegator) public view returns (uint) {
-      Delegate storage d = delegations[delegator];
+        Delegate storage d = delegations[delegator];
 
-      if (d.target == owner && d.expiry < block.timestamp) {
-          return votingModule.power(delegator);
-      }
-      return 0;
+        if (d.target == owner && d.expiry < block.timestamp) {
+            return votingModule.power(delegator);
+        }
+        return 0;
+    }
+
+    /**
+      * @notice Returns the future delegated voting power of a given account
+      * @param owner The address to query voting power for
+      * @param delegator The address that has delegated their voting power 
+      * @param timestamp The time to query voting power at 
+      * @return The delegated future voting power of the account
+    **/
+    function delegatedPowerAt(address owner, address delegator, uint timestamp) public view returns (uint) {
+        Delegate storage d = delegations[delegator];
+
+        if (d.target == owner && d.expiry < timestamp) {
+            return votingModule.predict(delegator, timestamp)
+        }
+        return 0;
     }
 
     /**
