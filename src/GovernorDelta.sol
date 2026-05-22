@@ -97,11 +97,8 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @return deltaAmountTime Capital-weighted time coefficient
     **/
     function stake(address owner) public view returns (uint, uint) {
-        if (delegations[owner].target == address(0)) {
-            Stake storage s = stakes[owner];
-            return (s.amount, s.deltaAmountTime);
-        }
-        return (0, 0);
+        Stake storage s = stakes[owner];
+        return (s.amount, s.deltaAmountTime);
     }
 
     /**
