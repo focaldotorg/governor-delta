@@ -169,7 +169,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @param voter The address of the voter
       * @return The voting records 
       */
-    function getRecords(uint proposalId, address voter, bool virtualized) external view returns (Receipt[4] memory) {
+    function getRecords(uint proposalId, address voter) external view returns (Record[4] memory) {
         Proposal storage p = proposals[proposalId];
 
         return ( 
@@ -185,7 +185,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @param id The delegation identifier
       * @return Delegation confirmation stateo
     **/
-    function checkDelegationHash(bytes32 id) public view returns (bool) {
+    function checkDelegation(bytes32 id) public view returns (bool) {
         (address delegator, address delegatee, uint256 expiry) = abi.decode(encoded, (address, address, uint256));
         Delegate storage d = delegations[delegator];
 
@@ -347,6 +347,17 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         uint votes = _commitVote(delegator, proposalId, support);
 
         emit VoteCast(msg.sender, proposalId, support, votes, "");
+    }
+
+    function castProxyVote(uint proposalId, bytes32 delegateId) public {
+        require(state(proposalId) == ProposalState.Active, "GovernorDelta::castProxyVote: voting is closed");
+        require(checkDelegation(delegateId), "GovernorDelta::castProxyVote: delegation invalid");
+        (address delegator, address delegatee,) = abi.decode(delegateId, (address, address, uint256));
+        Record storage record = (getRecords(proposalId, delegatee))[1];
+        require(!record.hasVoted, "GovernorDelta::castProxyVote: delegation spent");
+        uint votes = _commitVote(delegator, proposalId, record.support);
+
+        emit VoteCast(delegatee, proposalId, record.support, votes, "");
     }
 
     function castVetoVote(uint proposalId, uint8 support, string calldata reason) public {
