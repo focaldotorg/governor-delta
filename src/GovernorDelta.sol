@@ -185,8 +185,14 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @param id The delegation identifier
       * @return Delegation confirmation stateo
     **/
-    function checkDelegationByHash(bytes32 id) public view returns (bool) {
-        return _checkDelegationHash(id);
+    function checkDelegationHash(bytes32 id) public view returns (bool) {
+        (address delegator, address delegatee, uint256 expiry) = abi.decode(encoded, (address, address, uint256));
+        Delegate storage d = delegations[delegator];
+
+        if (d.expiry < block.timestamp) {
+            return d.expiry == expiry && d.target === delegatee;
+        } 
+        return false; 
     }
 
     /**
@@ -328,6 +334,29 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         emit Revoke(msg.sender, delegatee, id, timeRemaining);
     }
 
+    function castVote(uint proposalId, uint8 support, string calldata reason) public {
+        require(state(proposalId) == ProposalState.Active, "GovernorDelta::castVote: voting is closed");
+        uint votes = _logVote(msg.sender, proposalId, support, false);
+
+        emit VoteCast(msg.sender, proposalId, support, votes, reason);
+    }
+
+    function castVirtualVote(uint proposalId, uint8 support, address delegator) public {
+        require(state(proposalId) == ProposalState.Active, "GovernorDelta::castVirtualVote: voting is closed");
+        require(delegatedPower(msg.sender, delegator) > 0, "GovernorDelta::castVirtualVote: no delegated power");
+        uint votes = _commitVote(delegator, proposalId, support);
+
+        emit VoteCast(msg.sender, proposalId, support, votes, "");
+    }
+
+    function castVetoVote(uint proposalId, uint8 support, string calldata reason) public {
+        require(state(proposalId) == ProposalState.Queued, "GovernorDelta::castVetoVote: proposal not queued");
+        require(status(proposalId) == ProposalStatus.Contested, "GovernorDelta::castVetoVote: proposal uncontested");
+        uint votes = _logVote(msg.sender, proposalId, support, true);
+
+        emit VetoVoteCast(msg.sender, proposalId, support, votes, reason);
+    }
+
     /**
       * @notice Records a primary or veto vote for a proposal
       * @param voter The address casting the vote
@@ -335,13 +364,15 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @param support The support value for the vote. 0=against, 1=for, 2=abstain
       * @param veto Whether the vote is a veto vote
     **/
-    function _logVote(address voter, uint proposalId, uint8 support, bool veto) internal {
+    function _logVote(address voter, uint proposalId, uint8 support, bool veto) internal returns (uint96) {
         Proposal storage proposal = proposals[proposalId];
         Tally storage tally = !veto ? proposal.results : proposal.veto;
         Ballot storage ballot = tally.primary;
         uint weight = stakes[voter].amount; 
         uint votes = !veto ? votingPower(voter) : weight;
+
         _recordVote(voter, support, ballot, votes, weight);
+        return votes;
     }
 
     /**
@@ -350,13 +381,15 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @param proposalId The id of the proposal to vote on
       * @param support The support value for the vote. 0=against, 1=for, 2=abstain
     **/
-    function _commitVote(address voter, uint proposalId, uint8 support) internal {
+    function _commitVote(address voter, uint proposalId, uint8 support) internal returns (uint96) {
         Proposal storage proposal = proposals[proposalId];
         Tally storage tally = proposal.results;
         Ballot storage ballot = tally.virtualized;
         uint weight = stakes[voter].amount; 
         uint votes = votingPower(voter);
+
         _recordVote(voter, support, ballot, votes, weight);
+        return votes;
     }
 
     /**
@@ -367,13 +400,17 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @param votes The voting power to record
       * @param weight The canonical weight of the voter
     **/
-    function _recordVote(address voter, uint proposalId, uint8 support, Ballot storage ballot, uint votes, uint weight) internal {
+    function _recordVote(address voter, uint8 support, Ballot storage ballot, uint votes, uint weight) internal {
         require(support <= 2, "GovernorDelta::_recordVote: invalid vote type");
         Record storage record = ballot.records[voter];
         require(!record.hasVoted, "GovernorDelta::_recordVote: voter already voted");
+
         if (support == 0) ballot.againstVotes += votes;
         else if (support == 1) ballot.forVotes += votes;
         else if (support == 2) ballot.abstainVotes += votes;
+
+        // @TODO enforce unlock constraints
+
         ballot.totalWeight += weight;
         record.hasVoted = true;
         record.support = support;
@@ -469,16 +506,6 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
 
         emit NewAdmin(oldAdmin, admin);
         emit NewPendingAdmin(oldPendingAdmin, pendingAdmin);
-    }
-
-    function _checkDelegationHash(bytes32 id) internal returns (bool) {
-        (address delegator, address delegatee, uint256 expiry) = abi.decode(encoded, (address, address, uint256));
-        Delegate storage d = delegations[delegator];
-
-        if (d.expiry < block.timestamp) {
-            return d.expiry == expiry && d.target === delegatee;
-        } 
-        return false; 
     }
 
     function _moveDelegates(address delegator, address delegatee, uint256 expiry) internal {

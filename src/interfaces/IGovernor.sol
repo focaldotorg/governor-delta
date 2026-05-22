@@ -19,6 +19,14 @@ interface IGovernor {
     /// @param reason The reason given for the vote by the voter
     event VoteCast(address indexed voter, uint proposalId, uint8 support, uint votes, string reason);
 
+    /// @notice An event emitted when a veto vote has been cast on a proposal
+    /// @param voter The address which casted a vote
+    /// @param proposalId The proposal id which was voted on
+    /// @param support Support value for the vote. 0=against, 1=for, 2=abstain
+    /// @param votes Number of votes which were cast by the voter
+    /// @param reason The reason given for the vote by the voter
+    event VetoVoteCast(address indexed voter, uint proposalId, uint8 support, uint votes, string reason);
+
     /// @notice An event emitted when a proposal has been canceled
     event ProposalCanceled(uint id);
 
