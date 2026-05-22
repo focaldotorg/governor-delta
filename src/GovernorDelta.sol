@@ -329,6 +329,59 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
     }
 
     /**
+      * @notice Records a primary or veto vote for a proposal
+      * @param voter The address casting the vote
+      * @param proposalId The id of the proposal to vote on
+      * @param support The support value for the vote. 0=against, 1=for, 2=abstain
+      * @param veto Whether the vote is a veto vote
+    **/
+    function _logVote(address voter, uint proposalId, uint8 support, bool veto) internal {
+        Proposal storage proposal = proposals[proposalId];
+        Tally storage tally = !veto ? proposal.results : proposal.veto;
+        Ballot storage ballot = tally.primary;
+        uint weight = stakes[voter].amount; 
+        uint votes = !veto ? votingPower(voter) : weight;
+        _recordVote(voter, support, ballot, votes, weight);
+    }
+
+    /**
+      * @notice Records a virtual delegated vote for a proposal
+      * @param voter The address casting the virtual vote on behalf of their delegatee
+      * @param proposalId The id of the proposal to vote on
+      * @param support The support value for the vote. 0=against, 1=for, 2=abstain
+    **/
+    function _commitVote(address voter, uint proposalId, uint8 support) internal {
+        Proposal storage proposal = proposals[proposalId];
+        Tally storage tally = proposal.results;
+        Ballot storage ballot = tally.virtualized;
+        uint weight = stakes[voter].amount; 
+        uint votes = votingPower(voter);
+        _recordVote(voter, support, ballot, votes, weight);
+    }
+
+    /**
+      * @notice Core vote recording primitive, writes vote to ballot and updates tally
+      * @param voter The address casting the vote
+      * @param support The support value for the vote. 0=against, 1=for, 2=abstain
+      * @param ballot The ballot storage to record the vote in
+      * @param votes The voting power to record
+      * @param weight The canonical weight of the voter
+    **/
+    function _recordVote(address voter, uint proposalId, uint8 support, Ballot storage ballot, uint votes, uint weight) internal {
+        require(support <= 2, "GovernorDelta::_recordVote: invalid vote type");
+        Record storage record = ballot.records[voter];
+        require(!record.hasVoted, "GovernorDelta::_recordVote: voter already voted");
+        if (support == 0) ballot.againstVotes += votes;
+        else if (support == 1) ballot.forVotes += votes;
+        else if (support == 2) ballot.abstainVotes += votes;
+        ballot.totalWeight += weight;
+        record.hasVoted = true;
+        record.support = support;
+        record.weight = weight;
+        record.votes = votes;
+    }
+
+    /**
       * @notice Admin function for setting the voting delay
       * @param newVotingDelay Wew voting delay as a timestamp 
     **/
@@ -422,7 +475,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         (address delegator, address delegatee, uint256 expiry) = abi.decode(encoded, (address, address, uint256));
         Delegate storage d = delegations[delegator];
 
-        if ( d.expiry < block.timestamp) {
+        if (d.expiry < block.timestamp) {
             return d.expiry == expiry && d.target === delegatee;
         } 
         return false; 
