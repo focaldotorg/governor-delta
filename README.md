@@ -11,13 +11,6 @@ Implement and configure arbitrary voting power weighting mechanisms, to experime
 
 ---
 
-### Multi-Asset Governance
-Governor Delta supports multiple asset types as governance inputs within a single deployment, enabling organisations with heterogeneous capital structures to participate in governance without token migration or wrapping. Each token is registered with a configurable scoring weight, allowing organisations with complex capital structures — multiple share classes, LP tokens, receipt tokens, vault shares — to participate in governance without migration or wrapping. 
-
-_Scoring weights are not immutable, they are configurable parameters adjustable through governance proposals, enabling organisations to rebalance token authority as their capital structure evolves._
-
----
-
 ### Native Delegation
 Governor Delta does not require ERC20Votes or checkpoint extensions on the underlying token. Vote weight is tallied at the point of vote cast, with the participant's balance locked for the duration of the proposal. This enables any ERC20 to participate in governance without token migration or wrapping.
 

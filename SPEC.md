@@ -21,10 +21,6 @@ By default there is no recommended default guards, except for contextual proposa
 
 The one definitive and immutable currency of authority, defined on deployment, this is the default or "base" voting weight represented as a coefficient.
 
-### Subordinate tokens *
-
-Can be one of or multiple currencies to translate to authority, configurable at any time, must be expressed as a proportion of the cannonical token (eg 0.4).
-
 ### Quota
 
 #### Veto
