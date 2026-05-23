@@ -67,7 +67,7 @@ interface IGovernor {
     event NewAdmin(address oldAdmin, address newAdmin);
 
     /// @notice Emitted when an account changes a delegate
-    event Delegate(address indexed delegator, address indexed delegate, bytes32 indexed id);
+    event Delegate(address indexed delegator, address indexed delegate, uint expiry, bytes32 indexed id);
 
     /// @notice Emitted when an account revokes a delegate 
     event Revoke(address indexed delegator, address indexed delegate, uint timeUntilExpiry, bytes32 indexed id);

@@ -57,11 +57,12 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
     /// @notice The EIP-712 typehash for the contract's domain
     bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
 
-    /// @notice The EIP-712 typehash for the ballot struct used by the contract
-    bytes32 public constant BALLOT_TYPEHASH = keccak256("Ballot(uint256 proposalId,uint8 support)");
+    /// @notice The EIP-712 typehash for the vote struct used by the contract
+    bytes32 public constant VOTE_TYPEHASH = keccak256("Vote(uint256 proposalId,uint8 support)");
 
-    /// @notice The EIP-712 typehash for the delegation struct used by the contract
-    bytes32 public constant DELEGATION_TYPEHASH = keccak256("Delegation(address delegatee,uint256 nonce,uint256 expiry)");
+    /// @notice The EIP-712 typehash for the veto struct used by the contract
+    bytes32 public constant VETO_TYPEHASH = keccak256("VetoVote(uint256 proposalId,uint8 support)");
+
 
     /**
       * @notice Used to initialize the contract during delegator constructor
@@ -292,7 +293,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         require(delegations[msg.sender].target == address(0), "GovernorDelta::delegate: active delegation");
         require(s.unlockTime < block.timestamp, "GovernorDelta::delegate: vote already assigned");
         require(s.amount > 0, "GovernorDelta::delegate: no stake");
-        id = abi.encode(msg.sender, delegatee, expiry));
+        id = abi.encode(msg.sender, delegatee, expiry);
 
         _moveDelegates(msg.sender, delegatee, expiry);
         emit Delegate(msg.sender, delegatee, expiry, keccak256(id));
@@ -339,6 +340,21 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         emit VoteCast(msg.sender, proposalId, support, votes, reason);
     }
 
+    /**
+      * @notice Cast a vote for a proposal by signature
+      * @dev External function that accepts EIP-712 signatures for voting on proposals.
+    **/
+    function castVoteBySig(uint proposalId, uint8 support, uint8 v, bytes32 r, bytes32 s) external {
+        bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name)), _getChainId(), address(this)));
+        bytes32 structHash = keccak256(abi.encode(BALLOT_TYPEHASH, proposalId, support));
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
+        address signatory = ecrecover(digest, v, r, s);
+        require(signatory != address(0), "GovernorDelta::castVoteBySig: invalid signature");
+        uint votes = _logVote(signatory, proposalId, support, false);
+
+        emit VoteCast(signatory, proposalId, support, votes, "");
+    }
+
     function castVirtualVote(uint proposalId, uint8 support, address delegator) public {
         require(state(proposalId) == ProposalState.Active, "GovernorDelta::castVirtualVote: voting is closed");
         require(delegatedPower(msg.sender, delegator) > 0, "GovernorDelta::castVirtualVote: no delegated power");
@@ -347,23 +363,40 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         emit VoteCast(msg.sender, proposalId, support, votes, "");
     }
 
-    function castProxyVote(uint proposalId, bytes memory delegateId) public {
-        require(state(proposalId) == ProposalState.Active, "GovernorDelta::castProxyVote: voting is closed");
-        require(checkDelegation(delegateId), "GovernorDelta::castProxyVote: delegation invalid");
-        (address delegator, address delegatee,) = abi.decode(delegateId, (address, address, uint256));
-        Record storage record = (getRecords(proposalId, delegatee))[1];
-        require(!record.hasVoted, "GovernorDelta::castProxyVote: delegation spent");
-        uint votes = _commitVote(delegator, proposalId, record.support);
-
-        emit VoteCast(delegatee, proposalId, record.support, votes, "");
-    }
-
     function castVetoVote(uint proposalId, uint8 support, string calldata reason) public {
         require(state(proposalId) == ProposalState.Queued, "GovernorDelta::castVetoVote: proposal not queued");
         require(status(proposalId) == ProposalStatus.Contested, "GovernorDelta::castVetoVote: proposal uncontested");
         uint votes = _logVote(msg.sender, proposalId, support, true);
 
         emit VetoVoteCast(msg.sender, proposalId, support, votes, reason);
+    }
+
+    /**
+      * @notice Cast a veto vote for a proposal by signature
+      * @dev External function that accepts EIP-712 signatures for veto voting on proposals
+    **/
+    function castVetoVoteBySig(uint256 proposalId, uint8 support, uint8 v, bytes32 r, bytes32 s) external {
+        bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name)), _getChainId(), address(this)));
+        bytes32 structHash = keccak256(abi.encode(VETO_TYPEHASH, proposalId, support));
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
+        address signatory = ecrecover(digest, v, r, s);
+        require(signatory != address(0), "GovernorDelta::castVetoBySig: invalid signature");
+        uint votes = _logVote(signatory, proposalId, support, true);
+
+        emit VoteCast(signatory, proposalId, support, votes, "");
+    }
+
+    function castProxyVote(uint proposalId, bytes memory delegateId) public {
+        require(state(proposalId) == ProposalState.Active, "GovernorDelta::castProxyVote: voting is closed");
+        require(checkDelegation(delegateId), "GovernorDelta::castProxyVote: delegation invalid");
+        (address delegator, address delegatee,) = abi.decode(delegateId, (address, address, uint256));
+        Record storage receipt = (getRecords(proposalId, delegatee))[0];
+        Record storage record = (getRecords(proposalId, delegator))[1];
+        require(receipt.hasVoted, "GovernorDelta::castProxyVote: no intent signalled");
+        require(!record.hasVoted, "GovernorDelta::castProxyVote: delegation spent");
+        uint votes = _commitVote(delegator, proposalId, .support);
+
+        emit VoteCast(delegatee, proposalId, record.support, votes, "");
     }
 
     /**
@@ -528,7 +561,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         }
     } 
 
-    function getChainId() internal pure returns (uint) {
+    function _getChainId() internal pure returns (uint) {
         uint chainId;
         assembly { chainId := chainid() }
         return chainId;
