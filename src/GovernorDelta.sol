@@ -448,6 +448,8 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         uint votes = !veto ? votingPower(voter) : weight;
         stake.unlockTime = proposal.endTime;
 
+        // @TODO power prediction virtualized strategies
+  
         _recordVote(voter, support, ballot, votes, weight);
         return votes;
     }
@@ -467,7 +469,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         uint votes = votingPower(voter);
         stake.unlockTime = proposal.eta;
 
-        // @TODO factor for virtualized strategies
+        // @TODO power prediction virtualized strategies
 
         _recordVote(voter, support, ballot, votes, weight);
         return votes;
