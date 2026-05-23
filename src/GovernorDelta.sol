@@ -182,8 +182,8 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @param id The delegation identifier
       * @return Delegation confirmation stateo
     **/
-    function checkDelegation(bytes32 id) public view returns (bool) {
-        (address delegator, address delegatee, uint256 expiry) = abi.decode(encoded, (address, address, uint256));
+    function checkDelegation(bytes memory id) public view returns (bool) {
+        (address delegator, address delegatee, uint256 expiry) = abi.decode(id, (address, address, uint256));
         Delegate storage d = delegations[delegator];
 
         if (d.expiry < block.timestamp) {
@@ -284,7 +284,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @param expiry The timestamp at which the delegation expires
       * @return id The delegation identifier 
     **/
-    function delegate(address delegatee, uint256 expiry) external returns (bytes32 id) {
+    function delegate(address delegatee, uint256 expiry) external returns (bytes memory id) {
         Stake storage s = stakes[msg.sender];
         require(delegatee != address(0), "GovernorDelta::delegate: invalid delegatee");
         require(expiry > block.timestamp, "GovernorDelta::delegate: insufficient expiry");
@@ -292,43 +292,44 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         require(delegations[msg.sender].target == address(0), "GovernorDelta::delegate: active delegation");
         require(s.unlockTime < block.timestamp, "GovernorDelta::delegate: vote already assigned");
         require(s.amount > 0, "GovernorDelta::delegate: no stake");
-        id = keccak256(abi.encode(msg.sender, delegatee, expiry));
+        id = abi.encode(msg.sender, delegatee, expiry));
 
         _moveDelegates(msg.sender, delegatee, expiry);
-        emit Delegate(msg.sender, delegatee, id);
+        emit Delegate(msg.sender, delegatee, expiry, keccak256(id));
     }
 
     /**
       * @notice Redelegates voting power after an expired delegation
       * @param delegatee The address to delegate voting power to, pass msg.sender to reclaim
       * @param expiry The timestamp at which the delegation expires
-      * @return id The delegation identifier
+      * @return id The new delegation identifier
     **/
-    function redelegate(address delegatee, uint256 expiry) external returns (bytes32 id) {
+    function redelegate(address delegatee, uint256 expiry) external returns (bytes memory id) {
         require(delegatee != address(0), "GovernorDelta::redelegate: invalid delegatee");
         require(expiry > block.timestamp, "GovernorDelta::delegate: insufficient expiry");
         require(expiry - block.timestamp <= MAX_DELEGATION_PERIOD, "GovernorDelta::delegate: invalid expiry");
         require(delegations[msg.sender].expiry <= block.timestamp, "GovernorDelta::redelegate: active delegation");
-        id = keccak256(abi.encode(msg.sender, delegatee, expiry));
+        id = abi.encode(msg.sender, delegatee, expiry);
 
         _moveDelegates(msg.sender, delegatee, expiry);
-        emit Delegate(msg.sender, delegatee, id);
+        emit Delegate(msg.sender, delegatee, expiry, keccak256(id));
     }
 
     /**
       * @notice Revokes an active delegation
       * @dev Delegation identifier is recomputed from stored parameters 
+      * @return id The revoked delegation identifier
     **/
-    function revoke() external {
+    function revoke() external returns (bytes memory id) {
         Delegate storage d = delegations[msg.sender];
         require(d.target != address(0), "GovernorDelta::revoke: no active delegation");
         require(d.expiry > block.timestamp, "GovernorDelta::revoke: delegation already expired");
-        bytes32 id = keccak256(abi.encode(msg.sender, d.target, d.expiry));
+        id = abi.encode(msg.sender, d.target, d.expiry);
         uint256 timeRemaining = d.expiry - block.timestamp;
         address delegatee = d.target;
 
         _moveDelegates(msg.sender, msg.sender, block.timestamp);
-        emit Revoke(msg.sender, delegatee, id, timeRemaining);
+        emit Revoke(msg.sender, delegatee, timeRemaining, keccak256(id));
     }
 
     function castVote(uint proposalId, uint8 support, string calldata reason) public {
@@ -346,7 +347,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         emit VoteCast(msg.sender, proposalId, support, votes, "");
     }
 
-    function castProxyVote(uint proposalId, bytes32 delegateId) public {
+    function castProxyVote(uint proposalId, bytes memory delegateId) public {
         require(state(proposalId) == ProposalState.Active, "GovernorDelta::castProxyVote: voting is closed");
         require(checkDelegation(delegateId), "GovernorDelta::castProxyVote: delegation invalid");
         (address delegator, address delegatee,) = abi.decode(delegateId, (address, address, uint256));
@@ -526,5 +527,11 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
           stakes[delegator].unlockTime = block.timestamp;
         }
     } 
+
+    function getChainId() internal pure returns (uint) {
+        uint chainId;
+        assembly { chainId := chainid() }
+        return chainId;
+    }
 
 }

@@ -70,7 +70,7 @@ interface IGovernor {
     event Delegate(address indexed delegator, address indexed delegate, bytes32 indexed id);
 
     /// @notice Emitted when an account revokes a delegate 
-    event Revoke(address indexed delegator, address indexed delegate, bytes32 indexed id, uint timeUntilExpiry);
+    event Revoke(address indexed delegator, address indexed delegate, uint timeUntilExpiry, bytes32 indexed id);
 
     /// @notice Emitted when votingModule is changed
     event NewVotingModule(address oldModule, address newModule);
