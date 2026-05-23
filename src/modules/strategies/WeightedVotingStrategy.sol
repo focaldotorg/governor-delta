@@ -29,6 +29,4 @@ contract WeightedVotingStrategy is IVotingStrategy {
         return balance;
     }
 
-    function reduce(bytes32[] memory attestations) external returns (bool) { }
-
 }
