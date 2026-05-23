@@ -383,20 +383,52 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         require(signatory != address(0), "GovernorDelta::castVetoBySig: invalid signature");
         uint votes = _logVote(signatory, proposalId, support, true);
 
-        emit VetoVotCast(signatory, proposalId, support, votes, "");
+        emit VetoVoteCast(signatory, proposalId, support, votes, "");
     }
 
-    function castProxyVote(uint proposalId, bytes memory delegateId) public {
+    /**
+      * @notice Commits a batch of proxy votes for a proposal 
+      * @param proposalId The id of the proposal to cast votes for
+      * @param delegateIds The delegation identifiers to commit
+    **/
+    function batchProxyVotes(uint256 proposalId, bytes[] memory delegateIds) public {
         require(state(proposalId) == ProposalState.Active, "GovernorDelta::castProxyVote: voting is closed");
-        require(checkDelegation(delegateId), "GovernorDelta::castProxyVote: delegation invalid");
-        (address delegator, address delegatee,) = abi.decode(delegateId, (address, address, uint256));
-        Record storage receipt = (getRecords(proposalId, delegatee))[0];
-        Record storage record = (getRecords(proposalId, delegator))[1];
-        require(receipt.hasVoted, "GovernorDelta::castProxyVote: no intent signalled");
-        require(!record.hasVoted, "GovernorDelta::castProxyVote: delegation spent");
-        uint votes = _commitVote(delegator, proposalId, .support);
 
-        emit VoteCast(delegatee, proposalId, record.support, votes, "");
+        for (uint i = 0; i < delegateIds.length; i++) {
+            require(checkDelegation(delegateIds[i]), "GovernorDelta::castProxyVote: delegation invalid");
+            (address delegator, address delegatee,) = abi.decode(delegateIds[i], (address, address, uint256));
+            Record storage receipt = (getRecords(proposalId, delegatee))[0];
+            Record storage record = (getRecords(proposalId, delegator))[1];
+            require(receipt.hasVoted, "GovernorDelta::castProxyVote: no intent signalled");
+            require(!record.hasVoted, "GovernorDelta::castProxyVote: delegation spent");
+            uint votes = _commitVote(delegator, proposalId, receipt.support);
+
+            emit VoteCast(delegatee, proposalId, receipt.support, votes, "");
+        }
+    }
+
+    /**
+      * @notice Attests a batch of virtualized votes for a proposal during the timelock 
+      * @param proposalId The id of the proposal to attest delegations for
+      * @param delegateIds The delegation identifiers to attest
+    **/
+    function batchAttestVotes(uint256 proposalId, bytes[] memory delegateIds) external {
+        require(votingModule.virtualized(), "GovernorDelta::batchAttestVotes: unsupported virtualized voting strategy");
+        require(state(proposalId) == ProposalState.Queued, "GovernorDelta::batchAttestVotes: proposal not in timelock");
+
+        for (uint i = 0; i < delegateIds.length; i++) {
+            require(checkDelegation(delegateIds[i]), "GovernorDelta::batchAttestVotes: delegation invalid");
+            (address delegator, address delegatee, uint256 expiry) = abi.decode(delegateIds[i], (address, address, uint256));
+            Proposal storage proposal = proposals[proposalId];
+            Record storage record = proposal.results.virtualized.records[delegator];
+            require(record.hasVoted, "GovernorDelta::batchAttestVotes: delegation unspent");
+            
+            if (record.support == 0) proposal.results.primary.againstVotes += record.votes;
+            else if (record.support == 1) proposal.results.primary.forVotes += record.votes;
+            else if (record.support == 2) proposal.results.primary.abstainVotes += record.votes;
+
+            emit VoteAttested(proposalId, delegator, delegatee, record.votes);
+        }
     }
 
     /**
@@ -433,6 +465,8 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         uint weight = stakes[voter].amount; 
         uint votes = votingPower(voter);
         stake.unlockTime = proposal.eta;
+
+        // @TODO factor for virtualized strategies
 
         _recordVote(voter, support, ballot, votes, weight);
         return votes;
