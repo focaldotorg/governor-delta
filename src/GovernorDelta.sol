@@ -512,15 +512,14 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
 
     /**
       * @notice Admin function for setting the proposal threshold
-      * @dev newProposalThreshold must be greater than the hardcoded min
       * @param newProposalThreshold new proposal threshold
     **/
-    function _setProposalQuota(uint newProposalThreshold) external {
+    function _setProposalQuota(uint newProposalQuota) external {
         require(msg.sender == admin, "GovernorDelta::_setProposalThreshold: admin only");
-        uint oldProposalThreshold = proposalThreshold;
-        proposalQuota = newProposalThreshold;
+        uint oldProposalQuota = proposalQuota;
+        proposalQuota = newProposalQuota;
 
-        emit ProposalQuotaSet(oldProposalThreshold, proposalQuota);
+        emit ProposalQuotaSet(oldProposalQuota, proposalQuota);
     }
 
     /**
@@ -534,8 +533,36 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         for (uint8 i = 0; i < 4; i++) {
             require(configs[i].quorum >= MIN_QUORUM_VOTES, "GovernorDelta::_setProposalConfig: quorum below minimum");
             require(configs[i].duration >= MIN_VOTING_PERIOD && configs[i].duration <= MAX_VOTING_PERIOD, "GovernorDelta::_setProposalConfig: invalid duration");
+            uint oldProposalQuorum = proposalConfig[i].quorum;
             proposalConfig[i] = configs[i];
+
+            emit ProposalQuorumSet(i, oldProposalQuorum, configs[i].quorum);
         }
+    }
+
+    /**
+      * @notice Admin function for setting the veto quota
+      * @param newVetoQuota new proposal threshold
+    **/
+    function _setVetoQuota(uint newVetoQuota) external {
+        require(msg.sender == admin, "GovernorDelta::_setVetoQuota: admin only");
+        uint oldVetoQuota = vetoQuota;
+        vetoQuota = newVetoQuota;
+
+        emit VetoQuotaSet(oldVetoQuota, vetoQuota);
+    }
+
+    /**
+      * @notice Admin function for setting the veto quorum
+      * @param newVetoQuorum new veto quorum
+    **/
+    function _setVetoQuorum(uint newVetoQuorum) external {
+        require(msg.sender == admin, "GovernorDelta::_setVetoQuorum: admin only");
+        require(newVetoQuorum >= MIN_QUORUM_VOTES, "GovernorDelta::_setVetoQuorum: quorum below minimum");
+        uint oldVetoQuorum = vetoQuorum;
+        proposalQuota = newVetoQuorum;
+
+        emit VetoQuorumSet(oldVetoQuorum, vetoQuorum);
     }
 
     function _setVotingModule(address strategy) external {
