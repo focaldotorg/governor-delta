@@ -383,7 +383,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         require(signatory != address(0), "GovernorDelta::castVetoBySig: invalid signature");
         uint votes = _logVote(signatory, proposalId, support, true);
 
-        emit VoteCast(signatory, proposalId, support, votes, "");
+        emit VetoVotCast(signatory, proposalId, support, votes, "");
     }
 
     function castProxyVote(uint proposalId, bytes memory delegateId) public {
@@ -407,11 +407,13 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @param veto Whether the vote is a veto vote
     **/
     function _logVote(address voter, uint proposalId, uint8 support, bool veto) internal returns (uint96) {
+        Stake storage stake  = stake[voter];
         Proposal storage proposal = proposals[proposalId];
         Tally storage tally = !veto ? proposal.results : proposal.veto;
         Ballot storage ballot = tally.primary;
         uint weight = stakes[voter].amount; 
         uint votes = !veto ? votingPower(voter) : weight;
+        stake.unlockTime = proposal.endTime;
 
         _recordVote(voter, support, ballot, votes, weight);
         return votes;
@@ -424,11 +426,13 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @param support The support value for the vote. 0=against, 1=for, 2=abstain
     **/
     function _commitVote(address voter, uint proposalId, uint8 support) internal returns (uint96) {
+        Stake storage stake  = stake[voter];
         Proposal storage proposal = proposals[proposalId];
         Tally storage tally = proposal.results;
         Ballot storage ballot = tally.virtualized;
         uint weight = stakes[voter].amount; 
         uint votes = votingPower(voter);
+        stake.unlockTime = proposal.eta;
 
         _recordVote(voter, support, ballot, votes, weight);
         return votes;
@@ -443,15 +447,13 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @param weight The canonical weight of the voter
     **/
     function _recordVote(address voter, uint8 support, Ballot storage ballot, uint votes, uint weight) internal {
+        Record storage record = ballot.records[voter]; 
         require(support <= 2, "GovernorDelta::_recordVote: invalid vote type");
-        Record storage record = ballot.records[voter];
         require(!record.hasVoted, "GovernorDelta::_recordVote: voter already voted");
 
         if (support == 0) ballot.againstVotes += votes;
         else if (support == 1) ballot.forVotes += votes;
         else if (support == 2) ballot.abstainVotes += votes;
-
-        // @TODO enforce unlock constraints
 
         ballot.totalWeight += weight;
         record.hasVoted = true;
