@@ -166,7 +166,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @param proposalId the id of proposal
       * @param voter The address of the voter
       * @return The voting records 
-      */
+    **/
     function getRecords(uint proposalId, address voter) external view returns (Record[4] memory) {
         Proposal storage p = proposals[proposalId];
 
@@ -333,6 +333,12 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         emit Revoke(msg.sender, delegatee, timeRemaining, keccak256(id));
     }
 
+    /**
+      * @notice Cast a vote for a proposal
+      * @param proposalId The id of the proposal to vote on
+      * @param support The support value for the vote. 0=against, 1=for, 2=abstain
+      * @param reason The reason given for the vote by the voter
+    **/
     function castVote(uint proposalId, uint8 support, string calldata reason) public {
         require(state(proposalId) == ProposalState.Active, "GovernorDelta::castVote: voting is closed");
         uint votes = _logVote(msg.sender, proposalId, support, false);
@@ -342,7 +348,12 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
 
     /**
       * @notice Cast a vote for a proposal by signature
-      * @dev External function that accepts EIP-712 signatures for voting on proposals.
+      * @dev Accepts EIP-712 signatures for voting, enabling cold storage and gasless voting via relayers
+      * @param proposalId The id of the proposal to vote on
+      * @param support The support value for the vote. 0=against, 1=for, 2=abstain
+      * @param v The recovery byte of the signature
+      * @param r Output of the ECDSA signature pair
+      * @param s Output of the ECDSA signature pair
     **/
     function castVoteBySig(uint proposalId, uint8 support, uint8 v, bytes32 r, bytes32 s) external {
         bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name)), _getChainId(), address(this)));
@@ -355,6 +366,13 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         emit VoteCast(signatory, proposalId, support, votes, "");
     }
 
+    /**
+      * @notice Cast a virtual vote on behalf of a delegator
+      * @dev Commits delegated voting power to the virtualized ballot
+      * @param proposalId The id of the proposal to vote on
+      * @param support The support value for the vote. 0=against, 1=for, 2=abstain
+      * @param delegator The address whose delegated power is being committed
+    **/
     function castVirtualVote(uint proposalId, uint8 support, address delegator) public {
         require(state(proposalId) == ProposalState.Active, "GovernorDelta::castVirtualVote: voting is closed");
         require(delegatedPower(msg.sender, delegator) > 0, "GovernorDelta::castVirtualVote: no delegated power");
@@ -363,6 +381,13 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         emit VoteCast(msg.sender, proposalId, support, votes, "");
     }
 
+    /**
+      * @notice Cast a veto vote to contest a queued proposal
+      * @dev Only valid during the timelock period  
+      * @param proposalId The id of the proposal to veto vote on
+      * @param support The support value for the vote. 0=against, 1=for, 2=abstain
+      * @param reason The reason given for the veto vote by the voter
+    **/
     function castVetoVote(uint proposalId, uint8 support, string calldata reason) public {
         require(state(proposalId) == ProposalState.Queued, "GovernorDelta::castVetoVote: proposal not queued");
         require(status(proposalId) == ProposalStatus.Contested, "GovernorDelta::castVetoVote: proposal uncontested");
