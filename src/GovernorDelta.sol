@@ -80,13 +80,12 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         require(votingDelay_ >= MIN_VOTING_DELAY && votingDelay_ <= MAX_VOTING_DELAY, "GovernorDelta:: invalid voting delay");
 
         votingDelay = votingDelay_;
-        proposalQuota = proposalQuota_;
         timelock = ITimelock(timelock_);
         canonicalToken = IERC20(token_);
-        proposalConfig[0] = Graduated({ quorum: DEFAULT_TIER_0_QUORUM, duration: DEFAULT_TIER_0_DURATION });
-        proposalConfig[1] = Graduated({ quorum: DEFAULT_TIER_1_QUORUM, duration: DEFAULT_TIER_1_DURATION });
-        proposalConfig[2] = Graduated({ quorum: DEFAULT_TIER_2_QUORUM, duration: DEFAULT_TIER_2_DURATION });
-        proposalConfig[3] = Graduated({ quorum: DEFAULT_TIER_3_QUORUM, duration: DEFAULT_TIER_3_DURATION });
+        proposalConfig[0] = Graduated({ quorum: DEFAULT_TIER_0_QUORUM, duration: DEFAULT_TIER_0_DURATION, quota: _proposalQuota });
+        proposalConfig[1] = Graduated({ quorum: DEFAULT_TIER_1_QUORUM, duration: DEFAULT_TIER_1_DURATION, quota: _proposalQuota });
+        proposalConfig[2] = Graduated({ quorum: DEFAULT_TIER_2_QUORUM, duration: DEFAULT_TIER_2_DURATION, quota: _proposalQuota });
+        proposalConfig[3] = Graduated({ quorum: DEFAULT_TIER_3_QUORUM, duration: DEFAULT_TIER_3_DURATION, quota: _proposalQuota });
 
         votingModule = IVotingStrategy(address(new WeightedVotingStrategy(address(this))));
     }

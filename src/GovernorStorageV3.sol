@@ -31,16 +31,16 @@ contract GovernorStorageV1 is GovernorProxyStorage {
 
     /// @notice ------- DEPRECATED -----------
     /// @dev REASON: Proxy storage compatibility
-    /// @dev NOTE: Superseded by `Graduated`
+    /// @dev NOTE: Superseded by `Graduated.duration`
     /// @dev DO NOT REMOVE, REORDER, OR REUSE
     uint public _votingPeriod;
     /// @notice ------------------------------
 
     /// @notice ------- DEPRECATED -----------
     /// @dev REASON: Proxy storage compatibility
-    /// @dev NOTE: Superseded by `proposalQuota`
+    /// @dev NOTE: Superseded by `Graduated.quota` & `vetoQuota`
     /// @dev DO NOT REMOVE, REORDER, OR REUSE
-    uint internal _proposalThreshold;
+    uint public _proposalThreshold;
     /// @notice ------------------------------
 
     /// @notice Initial proposal id set at become
@@ -168,9 +168,6 @@ contract GovernorStorageV3 is GovernorEvents, GovernorStorageV2 {
 
     /// @notice Flag to toggle delegation functionality
     bool public allowDelegation;
-
-    /// @notice The number of votes required in order for a voter to become a proposer
-    uint public proposalQuota;
 
     /// @notice The number of votes required in order for a voter to initiate a veto proposal 
     uint public vetoQuota;
