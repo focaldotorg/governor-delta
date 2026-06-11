@@ -356,7 +356,6 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         for (uint i = 0; i < proposal.targets.length; i++) {
             timelock.executeTransaction.value(proposal.values[i])(proposal.targets[i], proposal.values[i], proposal.signatures[i], proposal.calldatas[i], proposal.eta);
         }
-
         emit ProposalExecuted(proposalId);
     }
 
@@ -365,9 +364,9 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @param proposalId The id of the proposal to cancel
     **/
     function cancel(uint proposalId) external {
-        require(msg.sender == admin, "GovernorDelta::cancel: admin only");
         require(state(proposalId) != ProposalState.Executed, "GovernorBravo::cancel: cannot cancel executed proposal");
-        Proposal storage proposal = proposals[proposalId]; 
+        Proposal storage proposal = proposals[proposalId];
+        require(msg.sender == proposal.proposer || msg.sender == admin, "GovernorDelta::cancel: not admin or proposer";        
         proposal.canceled = true;
 
         for (uint i = 0; i < proposal.targets.length; i++) {
