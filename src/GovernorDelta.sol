@@ -202,9 +202,9 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         ProposalState s = state(proposalId);
         uint quorumVotes = proposalConfig[proposal.tier].quorum;
 
-        if (s == ProposalState.Defeated || s == ProposalState.Expired || s == ProposalState.Executed) { 
+        if (s == ProposalState.Canceled || s == ProposalState.Defeated || s == ProposalState.Expired || s == ProposalState.Executed) { 
           return ProposalStatus.Resolved;
-        } else if (s == ProposalState.Canceled || (p.contested && p.veto.primary.totalWeight >= vetoQuorum)) {
+        } else if (p.veto.primary.forVotes > p.veto.primary.againstVotes && p.veto.primary.totalWeight > vetoQuorum) {
           return ProposalStatus.Dropped;
         } else if (p.contested) {
           return ProposalStatus.Contested;
@@ -351,12 +351,14 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
     **/
     function execute(uint proposalId) external payable {
         require(state(proposalId) == ProposalState.Queued, "GovernorBravo::execute: proposal can only be executed if it is queued");
+        require(status(proposalId) != ProposalStatus.Contested, "GovernorBravo::execute: proposal can only be executed if it is queued");
         Proposal storage proposal = proposals[proposalId];
         proposal.executed = true;
 
         for (uint i = 0; i < proposal.targets.length; i++) {
             timelock.executeTransaction.value(proposal.values[i])(proposal.targets[i], proposal.values[i], proposal.signatures[i], proposal.calldatas[i], proposal.eta);
         }
+
         emit ProposalExecuted(proposalId);
     }
 
@@ -368,7 +370,6 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         (uint balance,) = stake(msg.sender);
         require(balance >= vetoQuota, "GovernorDelta::veto: insufficient balance for quota");
         require(state(proposalId) == ProposalState.Queued, "GovernorDelta::veto: proposal can only be executed if it is queued");
-        require(status(proposalId) == ProposalStatus.Qualifed, "GovernorDelta::veto: proposal invalid status");
         Proposal storage proposal = proposals[proposalId];
         proposal.contested = true;
 
@@ -447,8 +448,9 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @return id The revoked delegation identifier
     **/
     function revoke() external returns (bytes memory id) {
+        Stake storage s = stakes[msg.sender];
         Delegate storage d = delegations[msg.sender];
-        require(d.target != address(0), "GovernorDelta::revoke: no active delegation");
+        require(s.unlockTime < block.timestamp, "GovernorDelta::resolve: delegation lock");
         require(d.expiry > block.timestamp, "GovernorDelta::revoke: delegation already expired");
         id = abi.encode(msg.sender, d.target, d.expiry);
         uint256 timeRemaining = d.expiry - block.timestamp;
@@ -589,7 +591,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @param support The support value for the vote. 0=against, 1=for, 2=abstain
       * @param veto Whether the vote is a veto vote
     **/
-    function _logVote(address voter, uint proposalId, uint8 support, bool veto) internal returns (uint96) {
+    function _logVote(address voter, uint proposalId, uint8 support, bool veto) internal returns (uint) {
         Stake storage stake  = stake[voter];
         Proposal storage proposal = proposals[proposalId];
         Tally storage tally = !veto ? proposal.results : proposal.veto;
@@ -598,8 +600,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         uint votes = predictedPower(voter, proposal.endTime);
         stake.unlockTime = proposal.endTime;
  
-        _recordVote(voter, support, ballot, veto ? weight : votes, weight);
-        return votes;
+        return _recordVote(voter, support, ballot, veto ? weight : votes, weight);
     }
 
     /**
@@ -608,17 +609,19 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @param proposalId The id of the proposal to vote on
       * @param support The support value for the vote. 0=against, 1=for, 2=abstain
     **/
-    function _commitVote(address voter, uint proposalId, uint8 support) internal returns (uint96) {
+    function _commitVote(address voter, uint proposalId, uint8 support) internal returns (uint) {
         Stake storage stake  = stake[voter];
         Proposal storage proposal = proposals[proposalId];
         Tally storage tally = proposal.results;
         Ballot storage ballot = tally.virtualized;
+
+        if (!module.virtualized()) ballot = tally.primary;
+
         uint weight = stakes[voter].amount; 
         uint votes = predictedPower(voter, proposal.endTime);
         stake.unlockTime = proposal.endTime;
 
-        _recordVote(voter, support, ballot, votes, weight);
-        return votes;
+        return _recordVote(voter, support, ballot, votes, weight);
     }
 
     /**
@@ -629,7 +632,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @param votes The voting power to record
       * @param weight The canonical weight of the voter
     **/
-    function _recordVote(address voter, uint8 support, Ballot storage ballot, uint votes, uint weight) internal {
+    function _recordVote(address voter, uint8 support, Ballot storage ballot, uint votes, uint weight) internal returns (uint) {
         Record storage record = ballot.records[voter]; 
         require(support <= 2, "GovernorDelta::_recordVote: invalid vote type");
         require(!record.hasVoted, "GovernorDelta::_recordVote: voter already voted");
@@ -643,6 +646,8 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         record.support = support;
         record.weight = weight;
         record.votes = votes;
+
+        return votes;
     }
 
     /**
