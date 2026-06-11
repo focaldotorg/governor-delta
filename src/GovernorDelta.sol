@@ -237,7 +237,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
             return ProposalState.Succeeded;
         } else if (p.executed) {
             return ProposalState.Executed;
-        } else if (block.timestamp >= add256(p.eta, timelock.GRACE_PERIOD())) {
+        } else if (block.timestamp >= p.eta + timelock.GRACE_PERIOD()) {
             return ProposalState.Expired;
         } else {
             return ProposalState.Queued;
@@ -311,14 +311,12 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
 
         uint startTs = block.timestamp + votingDelay;
         uint endTs = startTs + votingPeriod;
-        uint resolveTs = endTs + timelock.delay();
 
         proposalCount++;
         ProposalV2 memory newProposal;
         newProposal.id = proposalCount;
         newProposal.tier = tier;
         newProposal.proposer = msg.sender;
-        newProposal.eta = resolveTs;
         newProposal.targets = targets;
         newProposal.values = values;
         newProposal.signatures = signatures;
@@ -343,6 +341,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
             _queueOrRevert(proposal.targets[i], proposal.values[i], proposal.signatures[i], proposal.calldatas[i], proposal.endTime);
         }
         proposal.eta = block.timestamp + timelock.delay();
+        
         emit ProposalQueued(proposalId, proposal.eta);
     }
 
@@ -362,20 +361,45 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
     }
 
     /**
+      * @notice Executes a veto proposal on a queued proposal
+      * @param proposalId The id of the proposal to veto 
+    **/
+    function veto(uint proposalId) external payable {
+        (uint balance,) = stake(msg.sender);
+        require(balance >= vetoQuota, "GovernorDelta::veto: insufficient balance for quota");
+        require(state(proposalId) == ProposalState.Queued, "GovernorDelta::veto: proposal can only be executed if it is queued");
+        require(status(proposalId) == ProposalStatus.Qualifed, "GovernorDelta::veto: proposal invalid status");
+        Proposal storage proposal = proposals[proposalId];
+        proposal.contested = true;
+
+        emit ProposalVetoed(proposalId);
+    }
+
+    /**
+      * @notice Resolves a queued proposal if eta has passe or veto is satisfied 
+      * @param proposalId The id of the proposal to resolve 
+    **/
+    function resolve(uint proposalId) external payable {
+        require(state(proposalId) == ProposalState.Queued, "GovernorDelta::resolve: proposal can only be resolved if it is queued");
+        Proposal storage proposal = proposals[proposalId];
+ 
+       if(status(proposalId) == ProposalStatus.Dropped) {
+          _dropProposal(proposalId, proposal);
+       } else {
+          execute(proposalId);
+       }
+    }
+
+    /**
       * @notice Cancels a proposal only if sender is the proposer, or proposer delegates dropped below proposal threshold
       * @param proposalId The id of the proposal to cancel
     **/
     function cancel(uint proposalId) external {
         require(state(proposalId) != ProposalState.Executed, "GovernorBravo::cancel: cannot cancel executed proposal");
         Proposal storage proposal = proposals[proposalId];
-        require(msg.sender == proposal.proposer || msg.sender == admin, "GovernorDelta::cancel: not admin or proposer");        
-        proposal.canceled = true;
-
-        for (uint i = 0; i < proposal.targets.length; i++) {
-            timelock.cancelTransaction(proposal.targets[i], proposal.values[i], proposal.signatures[i], proposal.calldatas[i], proposal.eta);
-        }
-
-        emit ProposalCanceled(proposalId);
+        require(msg.sender == proposal.proposer, "GovernorDelta::cancel: not admin or proposer");        
+        
+        _dropProposal(proposalId, proposal);
     }
 
     /**
@@ -752,6 +776,16 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
           stakes[delegator].unlockTime = block.timestamp;
         }
     } 
+
+    function _dropProposal(uint proposalId, ProposalV2 memory proposal) internal {
+        proposal.canceled = true;
+
+        for (uint i = 0; i < proposal.targets.length; i++) {
+            timelock.cancelTransaction(proposal.targets[i], proposal.values[i], proposal.signatures[i], proposal.calldatas[i], proposal.eta);
+        }
+
+        emit ProposalCanceled(proposalId);
+    }
 
     function _getChainId() internal pure returns (uint) {
         uint chainId;
