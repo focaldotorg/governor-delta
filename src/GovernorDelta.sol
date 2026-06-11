@@ -309,7 +309,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
 
         uint startTs = block.timestamp + votingDelay;
         uint endTs = startTs + votingPeriod;
-        uint resolveTs = endTs + timelock.delay;
+        uint resolveTs = endTs + timelock.delay();
 
         proposalCount++;
         ProposalV2 memory newProposal;
@@ -328,6 +328,53 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
 
         emit ProposalCreated(newProposal.id, tier, msg.sender, targets, values, signatures, calldatas, startTs, endTs, description);
         return newProposal.id;
+    }
+
+    /**
+      * @notice Queues a proposal of state succeeded
+      * @param proposalId The id of the proposal to queue
+    **/
+    function queue(uint proposalId) external {
+        require(state(proposalId) == ProposalState.Succeeded, "GovernorBravo::queue: proposal can only be queued if it is succeeded");
+        Proposal storage proposal = proposals[proposalId];
+        for (uint i = 0; i < proposal.targets.length; i++) {
+            _queueOrRevert(proposal.targets[i], proposal.values[i], proposal.signatures[i], proposal.calldatas[i], proposal.endTime);
+        }
+        proposal.eta = block.timestamp + timelock.delay();
+        emit ProposalQueued(proposalId, proposal.eta);
+    }
+
+    /**
+      * @notice Executes a queued proposal if eta has passed
+      * @param proposalId The id of the proposal to execute
+    **/
+    function execute(uint proposalId) external payable {
+        require(state(proposalId) == ProposalState.Queued, "GovernorBravo::execute: proposal can only be executed if it is queued");
+        Proposal storage proposal = proposals[proposalId];
+        proposal.executed = true;
+
+        for (uint i = 0; i < proposal.targets.length; i++) {
+            timelock.executeTransaction.value(proposal.values[i])(proposal.targets[i], proposal.values[i], proposal.signatures[i], proposal.calldatas[i], proposal.eta);
+        }
+
+        emit ProposalExecuted(proposalId);
+    }
+
+    /**
+      * @notice Cancels a proposal only if sender is the proposer, or proposer delegates dropped below proposal threshold
+      * @param proposalId The id of the proposal to cancel
+    **/
+    function cancel(uint proposalId) external {
+        require(msg.sender == admin, "GovernorDelta::cancel: admin only");
+        require(state(proposalId) != ProposalState.Executed, "GovernorBravo::cancel: cannot cancel executed proposal");
+        Proposal storage proposal = proposals[proposalId]; 
+        proposal.canceled = true;
+
+        for (uint i = 0; i < proposal.targets.length; i++) {
+            timelock.cancelTransaction(proposal.targets[i], proposal.values[i], proposal.signatures[i], proposal.calldatas[i], proposal.eta);
+        }
+
+        emit ProposalCanceled(proposalId);
     }
 
     /**
@@ -686,6 +733,12 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
 
         emit NewAdmin(oldAdmin, admin);
         emit NewPendingAdmin(oldPendingAdmin, pendingAdmin);
+    }
+
+
+    function _queueOrRevert(address target, uint value, string memory signature, bytes memory data, uint eta) internal {
+        require(!timelock.queuedTransactions(keccak256(abi.encode(target, value, signature, data, eta))), "GovernorBravo::queueOrRevertInternal: identical proposal action already queued at eta");
+        timelock.queueTransaction(target, value, signature, data, eta);
     }
 
     function _moveDelegates(address delegator, address delegatee, uint256 expiry) internal {
