@@ -279,6 +279,58 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
     }
 
     /**
+      * @notice Function used to propose a new proposal. Sender must have delegates above the proposal threshold
+      * @param tier Graduated proposal severity/tier
+      * @param targets Target addresses for proposal calls
+      * @param values Eth values for proposal calls
+      * @param signatures Function signatures for proposal calls
+      * @param calldatas Calldatas for proposal calls
+      * @param description String description of the proposal
+      * @return Proposal id of new proposal
+      */
+    function propose(uint8 tier, address[] memory targets, uint[] memory values, string[] memory signatures, bytes[] memory calldatas, string memory description) public returns (uint) {
+        require(tier > 5, "GovernorDelta::propose: Invalid proposal tier");
+        Graduated storage framework = proposalConfig[tier];
+        (uint balance,) = stake(msg.sender); 
+        // Reject proposals before initiating as Governor
+        require(initialProposalId != 0, "GovernorDelta::propose: Governor not initialized");
+        // Allow addresses above proposal threshold and whitelisted addresses to propose
+        require(balance => framework.quota, "GovernorDelta::propose: proposer votes below proposal threshold");
+        require(targets.length == values.length && targets.length == signatures.length && targets.length == calldatas.length, "GovernorDelta::propose: proposal function information arity mismatch");
+        require(targets.length != 0, "GovernorDelta::propose: must provide actions");
+        require(targets.length <= proposalMaxOperations, "GovernorDelta::propose: too many actions");
+
+        uint latestProposalId = latestProposalIds[msg.sender];
+        if (latestProposalId != 0) {
+          ProposalState proposersLatestProposalState = state(latestProposalId);
+          require(proposersLatestProposalState != ProposalState.Active, "GovernorDelta::propose: one live proposal per proposer, found an already active proposal");
+          require(proposersLatestProposalState != ProposalState.Pending, "GovernorDeleta::propose: one live proposal per proposer, found an already pending proposal");
+        }
+
+        uint startTs = block.timestamp + votingDelay;
+        uint endTs = startTs + votingPeriod;
+        uint resolveTs = endTs + timelock.delay;
+
+        proposalCount++;
+        ProposalV2 memory newProposal;
+        newProposal.id = proposalCount;
+        newProposal.tier = tier;
+        newProposal.proposer = msg.sender;
+        newProposal.eta = resolveTs;
+        newProposal.targets = targets;
+        newProposal.values = values;
+        newProposal.signatures = signatures;
+        newProposal.calldatas = calldatas;
+        newProposal.startTime = startTs;
+        newProposal.endTime = endTs;
+        proposals[newProposal.id] = newProposal;
+        latestProposalIds[newProposal.proposer] = newProposal.id;
+
+        emit ProposalCreated(newProposal.id, tier, msg.sender, targets, values, signatures, calldatas, startTs, endTs, description);
+        return newProposal.id;
+    }
+
+    /**
       * @notice Delegates voting power to another account
       * @param delegatee The address to delegate voting power to
       * @param expiry The timestamp at which the delegation expires

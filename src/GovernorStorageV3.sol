@@ -304,6 +304,8 @@ contract GovernorStorageV3 is GovernorEvents, GovernorStorageV2 {
 
     /// @notice Proposal configuration 
     struct Graduated {
+        /// @notice The amount of votes of which a proposal is required to be proposed
+        uint256 quota;
         /// @notice The minimum number of votes of a proposal required for a proposal to be valid
         uint256 quorum;
         /// @notice The duration of which a proposal will be active for voting
