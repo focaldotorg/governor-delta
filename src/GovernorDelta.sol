@@ -289,7 +289,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @return Proposal id of new proposal
       */
     function propose(uint8 tier, address[] memory targets, uint[] memory values, string[] memory signatures, bytes[] memory calldatas, string memory description) public returns (uint) {
-        require(tier > 5, "GovernorDelta::propose: Invalid proposal tier");
+        require(tier < 5, "GovernorDelta::propose: Invalid proposal tier");
         Graduated storage framework = proposalConfig[tier];
         (uint balance,) = stake(msg.sender); 
         // Reject proposals before initiating as Governor
@@ -304,7 +304,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         if (latestProposalId != 0) {
           ProposalState proposersLatestProposalState = state(latestProposalId);
           require(proposersLatestProposalState != ProposalState.Active, "GovernorDelta::propose: one live proposal per proposer, found an already active proposal");
-          require(proposersLatestProposalState != ProposalState.Pending, "GovernorDeleta::propose: one live proposal per proposer, found an already pending proposal");
+          require(proposersLatestProposalState != ProposalState.Pending, "GovernorDelta::propose: one live proposal per proposer, found an already pending proposal");
         }
 
         uint startTs = block.timestamp + votingDelay;
@@ -521,12 +521,10 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         Tally storage tally = !veto ? proposal.results : proposal.veto;
         Ballot storage ballot = tally.primary;
         uint weight = stakes[voter].amount; 
-        uint votes = !veto ? votingPower(voter) : weight;
+        uint votes = predictedPower(voter, proposal.endTime);
         stake.unlockTime = proposal.endTime;
-
-        // @TODO power prediction virtualized strategies
-  
-        _recordVote(voter, support, ballot, votes, weight);
+ 
+        _recordVote(voter, support, ballot, veto ? weight : votes, weight);
         return votes;
     }
 
@@ -542,10 +540,8 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         Tally storage tally = proposal.results;
         Ballot storage ballot = tally.virtualized;
         uint weight = stakes[voter].amount; 
-        uint votes = votingPower(voter);
-        stake.unlockTime = proposal.eta;
-
-        // @TODO power prediction virtualized strategies
+        uint votes = predictedPower(voter, proposal.endTime);
+        stake.unlockTime = proposal.endTime;
 
         _recordVote(voter, support, ballot, votes, weight);
         return votes;
