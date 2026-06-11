@@ -450,8 +450,12 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
     function revoke() external returns (bytes memory id) {
         Stake storage s = stakes[msg.sender];
         Delegate storage d = delegations[msg.sender];
-        require(s.unlockTime < block.timestamp, "GovernorDelta::resolve: delegation lock");
         require(d.expiry > block.timestamp, "GovernorDelta::revoke: delegation already expired");
+
+        if (!module.virtualized()) {
+            require(s.unlockTime < block.timestamp, "GovernorDelta::resolve: delegation lock");
+        }
+
         id = abi.encode(msg.sender, d.target, d.expiry);
         uint256 timeRemaining = d.expiry - block.timestamp;
         address delegatee = d.target;
