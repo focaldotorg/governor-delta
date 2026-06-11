@@ -385,6 +385,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
  
        if(status(proposalId) == ProposalStatus.Dropped) {
           _dropProposal(proposalId, proposal);
+          emit ProposalDropped(proposalId);
        } else {
           execute(proposalId);
        }
@@ -397,9 +398,10 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
     function cancel(uint proposalId) external {
         require(state(proposalId) != ProposalState.Executed, "GovernorBravo::cancel: cannot cancel executed proposal");
         Proposal storage proposal = proposals[proposalId];
-        require(msg.sender == proposal.proposer, "GovernorDelta::cancel: not admin or proposer");        
+        require(msg.sender == proposal.proposer, "GovernorDelta::cancel: not admin or proposer");         
         
         _dropProposal(proposalId, proposal);
+        emit ProposalCanceled(proposalId);
     }
 
     /**
@@ -783,8 +785,6 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         for (uint i = 0; i < proposal.targets.length; i++) {
             timelock.cancelTransaction(proposal.targets[i], proposal.values[i], proposal.signatures[i], proposal.calldatas[i], proposal.eta);
         }
-
-        emit ProposalCanceled(proposalId);
     }
 
     function _getChainId() internal pure returns (uint) {

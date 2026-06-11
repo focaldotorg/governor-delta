@@ -33,6 +33,9 @@ interface IGovernor {
     /// @notice An event emitted when a proposal has been canceled
     event ProposalCanceled(uint id);
 
+    /// @notice An event emitted when a proposal has been dropped 
+    event ProposalDropped(uint id);
+
     /// @notice An event emitted when a proposal has been queued in the Timelock
     event ProposalQueued(uint id, uint eta);
 
