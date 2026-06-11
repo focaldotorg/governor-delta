@@ -202,8 +202,10 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         ProposalState s = state(proposalId);
         uint quorumVotes = proposalConfig[proposal.tier].quorum;
 
-        if (s == ProposalState.Canceled || s == ProposalState.Defeated || s == ProposalState.Expired || s == ProposalState.Executed) { 
+        if (s == ProposalState.Defeated || s == ProposalState.Expired || s == ProposalState.Executed) { 
           return ProposalStatus.Resolved;
+        } else if (s == ProposalState.Canceled || (p.contested && p.veto.primary.totalWeight >= vetoQuorum)) {
+          return ProposalStatus.Dropped;
         } else if (p.contested) {
           return ProposalStatus.Contested;
         } else if (p.results.primary.totalWeight >= quorumVotes) {
@@ -366,7 +368,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
     function cancel(uint proposalId) external {
         require(state(proposalId) != ProposalState.Executed, "GovernorBravo::cancel: cannot cancel executed proposal");
         Proposal storage proposal = proposals[proposalId];
-        require(msg.sender == proposal.proposer || msg.sender == admin, "GovernorDelta::cancel: not admin or proposer";        
+        require(msg.sender == proposal.proposer || msg.sender == admin, "GovernorDelta::cancel: not admin or proposer");        
         proposal.canceled = true;
 
         for (uint i = 0; i < proposal.targets.length; i++) {

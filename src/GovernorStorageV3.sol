@@ -316,7 +316,8 @@ contract GovernorStorageV3 is GovernorEvents, GovernorStorageV2 {
     enum ProposalStatus {
         Unqualified,
         Qualified, 
-        Contested, 
+        Contested,
+        Dropped,
         Resolved 
     }
 
