@@ -16,7 +16,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
     uint public constant MAX_VOTING_PERIOD = 100 days;
 
     /// @notice The max delegation period
-    uint public constant MAX_DELEGATION_PERIOD = 1 year;
+    uint public constant MAX_DELEGATION_PERIOD = 1 years;
 
     /// @notice The min setable voting delay 
     uint public constant MIN_VOTING_DELAY = 2 days;
@@ -128,7 +128,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
     function delegatedPower(address owner, address delegator) public view returns (uint) {
         Delegate storage d = delegations[delegator];
 
-        if (d.target == owner && d.expiry < block.timestamp) {
+        if (d.target == owner && block.timestamp < d.expiry)  {
             return votingModule.power(delegator);
         }
         return 0;
@@ -144,8 +144,8 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
     function delegatedPowerAt(address owner, address delegator, uint timestamp) public view returns (uint) {
         Delegate storage d = delegations[delegator];
 
-        if (d.target == owner && d.expiry < timestamp) {
-            return votingModule.predict(delegator, timestamp)
+        if (d.target == owner && block.timestamp < d.expiry && timestamp <= d.expiry) {
+            return votingModule.predict(delegator, timestamp);
         }
         return 0;
     }
