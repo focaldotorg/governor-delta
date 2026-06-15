@@ -186,7 +186,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         (address delegator, address delegatee, uint256 expiry) = abi.decode(id, (address, address, uint256));
         Delegate storage d = delegations[delegator];
 
-        if (d.expiry < block.timestamp) {
+        if (d.expiry < block.timestamp && d.expiry > 0) {
             return d.expiry == expiry && d.target === delegatee;
         } 
         return false; 
