@@ -20,7 +20,8 @@ contract WeightedVotingStrategy is IVotingStrategy {
     }
 
     function predict(address owner, uint timestamp) public view returns (uint) {
-        return 0;
+        return (uint balance,) = governor.stake(owner);
+        return balance;
     }
 
     function weight(address owner) public view returns (uint) {
