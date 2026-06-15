@@ -579,7 +579,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
             Record storage record = proposal.results.virtualized.records[delegator];
             require(record.hasVoted, "GovernorDelta::batchAttestVotes: delegation unspent");
             proposal.results.primary.totalWeight += record.weight;
-            
+
             if (record.support == 0) proposal.results.primary.againstVotes += record.votes;
             else if (record.support == 1) proposal.results.primary.forVotes += record.votes;
             else if (record.support == 2) proposal.results.primary.abstainVotes += record.votes;
@@ -602,7 +602,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         Ballot storage ballot = tally.primary;
         uint weight = stakes[voter].amount; 
         uint votes = predictedPower(voter, proposal.endTime);
-        stake.unlockTime = proposal.endTime;
+        stake.unlockTime = !veto ? proposal.endTime : proposal.eta;
  
         return _recordVote(voter, support, ballot, veto ? weight : votes, weight);
     }
