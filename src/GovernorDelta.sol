@@ -258,7 +258,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
 
         canonicalToken.transferFrom(msg.sender, address(this), amount);
 
-        emit Locked(msg.sender, address(canonicalToken), amount);
+        emit Locked(msg.sender, amount);
     }
 
     /**
@@ -277,7 +277,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
 
         canonicalToken.transfer(msg.sender, amount);
 
-        emit Unlocked(msg.sender, address(canonicalToken), amount);
+        emit Unlocked(msg.sender, amount);
     }
 
     /**
@@ -580,13 +580,12 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
             Record storage record = proposal.results.virtualized.records[delegator];
             require(record.hasVoted, "GovernorDelta::batchAttestVotes: delegation unspent");
             proposal.results.primary.totalWeight += record.weight;
-            bytes32 delegationId = keccak256(delegator, delegatee, expiry);
 
             if (record.support == 0) proposal.results.primary.againstVotes += record.votes;
             else if (record.support == 1) proposal.results.primary.forVotes += record.votes;
             else if (record.support == 2) proposal.results.primary.abstainVotes += record.votes;
 
-            emit VoteAttested(proposalId, delegator, delegatee, record.votes, delegationId);
+            emit VoteAttested(proposalId, delegator, delegatee, record.votes, keccak25(delegateIds[i]));
         }
     }
 

@@ -3,10 +3,10 @@ interface ^0.8.10;
 interface IGovernor {
   
     /// @notice Emitted when a stakeholder locks canonical tokens into the governor
-    event Locked(address indexed account, address indexed token, uint96 amount);
+    event Locked(address indexed account, uint amount);
 
     /// @notice Emitted when a stakeholder unlocks canonical tokens from the governor
-    event Unlocked(address indexed account, address indexed token, uint96 amount);
+    event Unlocked(address indexed account, uint amount);
 
     /// @notice An event emitted when a new proposal is created
     event ProposalCreated(uint id, uint8 tier, address proposer, address[] targets, uint[] values, string[] signatures, bytes[] calldatas, uint startBlock, uint endBlock, string description);
@@ -28,7 +28,7 @@ interface IGovernor {
     event VetoVoteCast(address indexed voter, uint proposalId, uint8 support, uint votes, string reason);
 
     /// @notice Emitted when a virtualized vote is attested and promoted to the primary tally during timelock
-    event VoteAttested(uint256 indexed proposalId, address indexed delegator, address indexed delegatee, uint256 votes, bytes32 indexed id);
+    event VoteAttested(uint256 indexed proposalId, address indexed delegator, address indexed delegatee, uint votes, bytes32 indexed id);
 
     /// @notice An event emitted when a proposal has been canceled
     event ProposalCanceled(uint id);
