@@ -28,7 +28,7 @@ interface IGovernor {
     event VetoVoteCast(address indexed voter, uint proposalId, uint8 support, uint votes, string reason);
 
     /// @notice Emitted when a virtualized vote is attested and promoted to the primary tally during timelock
-    event VoteAttested(uint256 indexed proposalId, address indexed delegator, address indexed delegatee, uint256 votes);
+    event VoteAttested(uint256 indexed proposalId, address indexed delegator, address indexed delegatee, uint256 votes, bytes32 indexed id);
 
     /// @notice An event emitted when a proposal has been canceled
     event ProposalCanceled(uint id);
