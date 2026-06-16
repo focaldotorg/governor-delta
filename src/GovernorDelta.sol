@@ -22,7 +22,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
     uint public constant MIN_VOTING_DELAY = 2 days;
 
     /// @notice The max setable voting delay
-    uint public constant MAX_VOTING_DELAY = 2 weeks; 
+    uint public constant MAX_VOTING_DELAY = 1 weeks; 
 
     /// @notice The minimum number of votes of a proposal required for a proposal to be valid
     uint public constant MIN_QUORUM_VOTES = 400000e18; 
@@ -301,8 +301,8 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         require(targets.length == values.length && targets.length == signatures.length && targets.length == calldatas.length, "GovernorDelta::propose: proposal function information arity mismatch");
         require(targets.length != 0, "GovernorDelta::propose: must provide actions");
         require(targets.length <= proposalMaxOperations, "GovernorDelta::propose: too many actions");
-
         uint latestProposalId = latestProposalIds[msg.sender];
+
         if (latestProposalId != 0) {
           ProposalState proposersLatestProposalState = state(latestProposalId);
           require(proposersLatestProposalState != ProposalState.Active, "GovernorDelta::propose: one live proposal per proposer, found an already active proposal");
@@ -585,7 +585,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
             else if (record.support == 1) proposal.results.primary.forVotes += record.votes;
             else if (record.support == 2) proposal.results.primary.abstainVotes += record.votes;
 
-            emit VoteAttested(proposalId, delegator, delegatee, record.votes, keccak25(delegateIds[i]));
+            emit VoteAttested(proposalId, delegator, delegatee, record.votes, keccak256(delegateIds[i]));
         }
     }
 
