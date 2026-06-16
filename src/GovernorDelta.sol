@@ -301,6 +301,8 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         require(targets.length == values.length && targets.length == signatures.length && targets.length == calldatas.length, "GovernorDelta::propose: proposal function information arity mismatch");
         require(targets.length != 0, "GovernorDelta::propose: must provide actions");
         require(targets.length <= proposalMaxOperations, "GovernorDelta::propose: too many actions");
+        uint startTs = block.timestamp + votingDelay;
+        uint endTs = startTs + votingPeriod;
         uint latestProposalId = latestProposalIds[msg.sender];
 
         if (latestProposalId != 0) {
@@ -308,9 +310,6 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
           require(proposersLatestProposalState != ProposalState.Active, "GovernorDelta::propose: one live proposal per proposer, found an already active proposal");
           require(proposersLatestProposalState != ProposalState.Pending, "GovernorDelta::propose: one live proposal per proposer, found an already pending proposal");
         }
-
-        uint startTs = block.timestamp + votingDelay;
-        uint endTs = startTs + votingPeriod;
 
         proposalCount++;
         ProposalV2 memory newProposal;
@@ -367,7 +366,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @notice Executes a veto proposal on a queued proposal
       * @param proposalId The id of the proposal to veto 
     **/
-    function veto(uint proposalId) external payable {
+    function veto(uint proposalId) external {
         (uint balance,) = stake(msg.sender);
         require(balance >= vetoQuota, "GovernorDelta::veto: insufficient balance for quota");
         require(state(proposalId) == ProposalState.Queued, "GovernorDelta::veto: proposal can only be executed if it is queued");
@@ -412,7 +411,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @param expiry The timestamp at which the delegation expires
       * @return id The delegation identifier 
     **/
-    function delegate(address delegatee, uint256 expiry) external returns (bytes memory id) {
+    function delegate(address delegatee, uint expiry) external returns (bytes memory id) {
         Stake storage s = stakes[msg.sender];
         require(delegatee != address(0), "GovernorDelta::delegate: invalid delegatee");
         require(expiry > block.timestamp, "GovernorDelta::delegate: insufficient expiry");
@@ -532,7 +531,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @notice Cast a veto vote for a proposal by signature
       * @dev External function that accepts EIP-712 signatures for veto voting on proposals
     **/
-    function castVetoVoteBySig(uint256 proposalId, uint8 support, uint8 v, bytes32 r, bytes32 s) external {
+    function castVetoVoteBySig(uint proposalId, uint8 support, uint8 v, bytes32 r, bytes32 s) external {
         bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name)), _getChainId(), address(this)));
         bytes32 structHash = keccak256(abi.encode(VETO_TYPEHASH, proposalId, support));
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
@@ -548,7 +547,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @param proposalId The id of the proposal to cast votes for
       * @param delegateIds The delegation identifiers to commit
     **/
-    function batchProxyVotes(uint256 proposalId, bytes[] memory delegateIds) public {
+    function batchProxyVotes(uint proposalId, bytes[] memory delegateIds) public {
         require(state(proposalId) == ProposalState.Active, "GovernorDelta::castProxyVote: voting is closed");
 
         for (uint i = 0; i < delegateIds.length; i++) {
@@ -569,7 +568,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @param proposalId The id of the proposal to attest delegations for
       * @param delegateIds The delegation identifiers to attest
     **/
-    function batchAttestVotes(uint256 proposalId, bytes[] memory delegateIds) external {
+    function batchAttestVotes(uint proposalId, bytes[] memory delegateIds) external {
         require(votingModule.virtualized(), "GovernorDelta::batchAttestVotes: unsupported virtualized voting strategy");
         require(state(proposalId) == ProposalState.Queued, "GovernorDelta::batchAttestVotes: proposal not in timelock");
 
