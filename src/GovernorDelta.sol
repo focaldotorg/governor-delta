@@ -204,7 +204,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
 
         if (s == ProposalState.Canceled || s == ProposalState.Defeated || s == ProposalState.Expired || s == ProposalState.Executed) { 
           return ProposalStatus.Resolved;
-        } else if (p.veto.primary.forVotes > p.veto.primary.againstVotes && p.veto.primary.totalWeight > vetoQuorum) {
+        } else if (p.veto.primary.forVotes > p.veto.primary.againstVotes && p.veto.primary.totalWeight => vetoQuorum) {
           return ProposalStatus.Dropped;
         } else if (p.contested) {
           return ProposalStatus.Contested;
