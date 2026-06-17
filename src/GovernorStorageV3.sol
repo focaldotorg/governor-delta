@@ -294,20 +294,20 @@ contract GovernorStorageV3 is GovernorEvents, GovernorStorageV2 {
         uint8 decision;
 
         /// @notice The number of votes the voter had, which were cast
-        uint96 power;
+        uint power;
 
         /// @notice The number of tokens the voter had, which were cast 
-        uint96 weight;
+        uint weight;
     }
 
     /// @notice Proposal configuration 
     struct Graduated {
         /// @notice The amount of votes of which a proposal is required to be proposed
-        uint256 quota;
+        uint quota;
         /// @notice The minimum number of votes of a proposal required for a proposal to be valid
-        uint256 quorum;
+        uint quorum;
         /// @notice The duration of which a proposal will be active for voting
-        uint256 duration;
+        uint duration;
     }
 
     /// @notice Possible states that a proposal may be in
