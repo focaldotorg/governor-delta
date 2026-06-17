@@ -486,6 +486,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @param s Output of the ECDSA signature pair
     **/
     function castVoteBySig(uint proposalId, uint8 support, uint8 v, bytes32 r, bytes32 s) external {
+        require(state(proposalId) == ProposalState.Active, "GovernorDelta::castVote: voting is closed");
         bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name)), _getChainId(), address(this)));
         bytes32 structHash = keccak256(abi.encode(BALLOT_TYPEHASH, proposalId, support));
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
@@ -531,6 +532,8 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @dev External function that accepts EIP-712 signatures for veto voting on proposals
     **/
     function castVetoVoteBySig(uint proposalId, uint8 support, uint8 v, bytes32 r, bytes32 s) external {
+        require(state(proposalId) == ProposalState.Queued, "GovernorDelta::castVetoVote: proposal not queued");
+        require(status(proposalId) == ProposalStatus.Contested, "GovernorDelta::castVetoVote: proposal uncontested");
         bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name)), _getChainId(), address(this)));
         bytes32 structHash = keccak256(abi.encode(VETO_TYPEHASH, proposalId, support));
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
@@ -573,7 +576,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
 
         for (uint i = 0; i < delegateIds.length; i++) {
             require(checkDelegation(delegateIds[i]), "GovernorDelta::batchAttestVotes: delegation invalid");
-            (address delegator, address delegatee, uint256 expiry) = abi.decode(delegateIds[i], (address, address, uint256));
+            (address delegator, address delegatee, uint256 expiry) = abi.decode(delegateIds[i], (address, address, uint));
             Proposal storage proposal = proposals[proposalId];
             Record storage record = proposal.results.virtualized.records[delegator];
             require(record.hasVoted, "GovernorDelta::batchAttestVotes: delegation unspent");
@@ -595,7 +598,6 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @param veto Whether the vote is a veto vote
     **/
     function _logVote(address voter, uint proposalId, uint8 support, bool veto) internal returns (uint) {
-        Stake storage stake  = stake[voter];
         Proposal storage proposal = proposals[proposalId];
         Tally storage tally = !veto ? proposal.results : proposal.veto;
         Ballot storage ballot = tally.primary;
@@ -613,7 +615,6 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @param support The support value for the vote. 0=against, 1=for, 2=abstain
     **/
     function _commitVote(address voter, uint proposalId, uint8 support) internal returns (uint) {
-        Stake storage stake  = stake[voter];
         Proposal storage proposal = proposals[proposalId];
         Tally storage tally = proposal.results;
         Ballot storage ballot = tally.virtualized;
@@ -796,6 +797,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
     function _getChainId() internal pure returns (uint) {
         uint chainId;
         assembly { chainId := chainid() }
+
         return chainId;
     }
 
