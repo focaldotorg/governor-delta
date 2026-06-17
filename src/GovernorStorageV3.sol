@@ -196,6 +196,8 @@ contract GovernorStorageV3 is GovernorEvents, GovernorStorageV2 {
         uint amount;
         /// @notice The timestamp of the stakeholders last attested action
         uint unlockTime;
+        /// @notice The timestamp of the last stake state change, used to settle accumulator values
+        uint lastUpdateTime;
         /// @notice Running sum of stake amount multiplied by time elapsed 
         uint deltaAmountTime;
     }

@@ -252,8 +252,8 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         require(amount > 0, "GovernorDelta::lock: invalid amount");
         Stake storage s = stakes[msg.sender];
         uint256 deltaTime = block.timestamp - s.lastUpdateTime;
-        s.deltaAmountTime += s.amount * deltaTime;
         s.lastUpdateTime = block.timestamp;
+        s.deltaAmountTime += s.amount * deltaTime;
         s.amount += amount;
 
         canonicalToken.transferFrom(msg.sender, address(this), amount);
@@ -271,8 +271,8 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         require(amount <= s.amount, "GovernorDelta::withdraw: insufficient balance");
         require(s.unlockTime < block.timestamp, "GovernorDelta::withdraw: active vote or delegation");
         uint256 deltaTime = block.timestamp - s.lastUpdateTime;
-        s.deltaAmountTime += s.amount * deltaTime;
         s.lastUpdateTime = block.timestamp;
+        s.deltaAmountTime += s.amount * deltaTime;
         s.amount -= amount;
 
         canonicalToken.transfer(msg.sender, amount);
@@ -431,7 +431,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @param expiry The timestamp at which the delegation expires
       * @return id The new delegation identifier
     **/
-    function redelegate(address delegatee, uint256 expiry) external returns (bytes memory id) {
+    function redelegate(address delegatee, uint expiry) external returns (bytes memory id) {
         require(delegatee != address(0), "GovernorDelta::redelegate: invalid delegatee");
         require(expiry > block.timestamp, "GovernorDelta::delegate: insufficient expiry");
         require(expiry - block.timestamp <= MAX_DELEGATION_PERIOD, "GovernorDelta::delegate: invalid expiry");
@@ -448,12 +448,11 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @return id The revoked delegation identifier
     **/
     function revoke() external returns (bytes memory id) {
-        Stake storage s = stakes[msg.sender];
         Delegate storage d = delegations[msg.sender];
         require(d.expiry > block.timestamp, "GovernorDelta::revoke: delegation already expired");
 
         if (!module.virtualized()) {
-            require(s.unlockTime < block.timestamp, "GovernorDelta::resolve: delegation lock");
+            require(stakes[msg.sender].unlockTime < block.timestamp, "GovernorDelta::resolve: delegation lock");
         }
 
         id = abi.encode(msg.sender, d.target, d.expiry);
@@ -780,10 +779,8 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
     function _moveDelegates(address delegator, address delegatee, uint256 expiry) internal {
         if (delegator != delegatee) {
           delegations[delegator] = Delegate({ target: delegatee, expiry: expiry });
-          stakes[delegator].unlockTime = expiry;
         } else {
           delete delegations[delegator];
-
           stakes[delegator].unlockTime = block.timestamp;
         }
     } 
