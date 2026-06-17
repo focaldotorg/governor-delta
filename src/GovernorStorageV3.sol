@@ -166,8 +166,8 @@ contract GovernorStorageV3 is GovernorEvents, GovernorStorageV2 {
     /// @notice The basis token or currency of authority 
     IVotingStrategy public votingModule;
 
-    /// @notice Flag to toggle delegation functionality
-    bool public allowDelegation;
+    /// @notice Flag to enable delegation functionality
+    bool public delegationActive;
 
     /// @notice The number of votes required in order for a voter to initiate a veto proposal 
     uint public vetoQuota;

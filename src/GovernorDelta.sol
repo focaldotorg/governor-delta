@@ -168,7 +168,6 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
     **/
     function getRecords(uint proposalId, address voter) external view returns (Record[4] memory) {
         Proposal storage p = proposals[proposalId];
-
         return ( 
           p.results.primary.records[voter],
           p.results.virtualized.records[voter], 
@@ -413,6 +412,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
     **/
     function delegate(address delegatee, uint expiry) external returns (bytes memory id) {
         Stake storage s = stakes[msg.sender];
+        require(delegationActive, "GovernorDelta::delegate: delegation not active");
         require(delegatee != address(0), "GovernorDelta::delegate: invalid delegatee");
         require(expiry > block.timestamp, "GovernorDelta::delegate: insufficient expiry");
         require(expiry - block.timestamp <= MAX_DELEGATION_PERIOD, "GovernorDelta::delegate: invalid expiry");
@@ -432,6 +432,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @return id The new delegation identifier
     **/
     function redelegate(address delegatee, uint expiry) external returns (bytes memory id) {
+        require(delegationActive, "GovernorDelta::redelegate: delegation not active");
         require(delegatee != address(0), "GovernorDelta::redelegate: invalid delegatee");
         require(expiry > block.timestamp, "GovernorDelta::delegate: insufficient expiry");
         require(expiry - block.timestamp <= MAX_DELEGATION_PERIOD, "GovernorDelta::delegate: invalid expiry");
@@ -449,6 +450,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
     **/
     function revoke() external returns (bytes memory id) {
         Delegate storage d = delegations[msg.sender];
+        require(delegationActive, "GovernorDelta::revoke: delegation not active");
         require(d.expiry > block.timestamp, "GovernorDelta::revoke: delegation already expired");
 
         if (!module.virtualized()) {
@@ -505,6 +507,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @param delegator The address whose delegated power is being committed
     **/
     function castVirtualVote(uint proposalId, uint8 support, address delegator) public {
+        require(delegationActive, "GovernorDelta::castVirtualVote: delegation not active");
         require(state(proposalId) == ProposalState.Active, "GovernorDelta::castVirtualVote: voting is closed");
         require(delegatedPower(msg.sender, delegator) > 0, "GovernorDelta::castVirtualVote: no delegated power");
         uint votes = _commitVote(delegator, proposalId, support);
@@ -550,6 +553,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @param delegateIds The delegation identifiers to commit
     **/
     function batchProxyVotes(uint proposalId, bytes[] memory delegateIds) public {
+        require(delegationActive, "GovernorDelta::batchProxyVotes: delegation not active");
         require(state(proposalId) == ProposalState.Active, "GovernorDelta::castProxyVote: voting is closed");
 
         for (uint i = 0; i < delegateIds.length; i++) {
@@ -571,6 +575,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @param delegateIds The delegation identifiers to attest
     **/
     function batchAttestVotes(uint proposalId, bytes[] memory delegateIds) external {
+        require(delegationActive, "GovernorDelta::batchAttestVotes: delegation not active");
         require(votingModule.virtualized(), "GovernorDelta::batchAttestVotes: unsupported virtualized voting strategy");
         require(state(proposalId) == ProposalState.Queued, "GovernorDelta::batchAttestVotes: proposal not in timelock");
 
@@ -754,6 +759,18 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         pendingAdmin = newPendingAdmin;
 
         emit NewPendingAdmin(oldPendingAdmin, newPendingAdmin);
+    }
+
+    /**
+      * @notice Irreversible configuration change
+      * @dev Admin function for activating delegation
+    **/
+    function _activateDelegation() external {
+        require(msg.sender == admin, "GovernorDelta:_activateDelegation: admin only");
+        require(!delegationActive, "GovernorDelta::_activateDelegation: delegation already active");
+        delegationActive = true;
+
+        emit DelegationActivated();
     }
 
     /**

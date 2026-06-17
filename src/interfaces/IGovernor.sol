@@ -81,4 +81,7 @@ interface IGovernor {
     /// @notice Emitted when votingModule is changed
     event NewVotingModule(address oldModule, address newModule);
 
+    /// @notice Emitted when delegation is activated
+    event DelegationActivated();
+
 }
