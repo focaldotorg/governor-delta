@@ -254,6 +254,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         s.lastUpdateTime = block.timestamp;
         s.deltaAmountTime += s.amount * deltaTime;
         s.amount += amount;
+        totalStaked += amount;
 
         canonicalToken.transferFrom(msg.sender, address(this), amount);
 
@@ -273,6 +274,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         s.lastUpdateTime = block.timestamp;
         s.deltaAmountTime += s.amount * deltaTime;
         s.amount -= amount;
+        totalStaked -= amount;
 
         canonicalToken.transfer(msg.sender, amount);
 
