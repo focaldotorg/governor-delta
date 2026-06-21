@@ -1,10 +1,10 @@
 pragma solidity ^0.8.10;
 
-import "@interfaces/IGovernor.sol";
 import "@interfaces/IGovernorAlpha.sol";
-import "GovernorStorageV3.sol";
+import "@strategies/WeightedVotingStrategy.sol";
+import "@root/GovernorStorageV3.sol";
 
-contract GovernorDelta is IGovernor, GovernorStorageV3 {
+contract GovernorDelta is GovernorStorageV3 {
 
     /// @notice The name of this contract
     string public constant name = "Governor Delta";
@@ -16,7 +16,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
     uint public constant MAX_VOTING_PERIOD = 100 days;
 
     /// @notice The max delegation period
-    uint public constant MAX_DELEGATION_PERIOD = 1 years;
+    uint public constant MAX_DELEGATION_PERIOD = 365 days;
 
     /// @notice The min setable voting delay 
     uint public constant MIN_VOTING_DELAY = 2 days;
@@ -82,10 +82,10 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         votingDelay = votingDelay_;
         timelock = ITimelock(timelock_);
         canonicalToken = IERC20(token_);
-        proposalConfig[0] = Graduated({ quorum: DEFAULT_TIER_0_QUORUM, duration: DEFAULT_TIER_0_DURATION, quota: _proposalQuota });
-        proposalConfig[1] = Graduated({ quorum: DEFAULT_TIER_1_QUORUM, duration: DEFAULT_TIER_1_DURATION, quota: _proposalQuota });
-        proposalConfig[2] = Graduated({ quorum: DEFAULT_TIER_2_QUORUM, duration: DEFAULT_TIER_2_DURATION, quota: _proposalQuota });
-        proposalConfig[3] = Graduated({ quorum: DEFAULT_TIER_3_QUORUM, duration: DEFAULT_TIER_3_DURATION, quota: _proposalQuota });
+        proposalConfig[0] = Graduated({ quorum: DEFAULT_TIER_0_QUORUM, duration: DEFAULT_TIER_0_DURATION, quota: proposalQuota_ });
+        proposalConfig[1] = Graduated({ quorum: DEFAULT_TIER_1_QUORUM, duration: DEFAULT_TIER_1_DURATION, quota: proposalQuota_ });
+        proposalConfig[2] = Graduated({ quorum: DEFAULT_TIER_2_QUORUM, duration: DEFAULT_TIER_2_DURATION, quota: proposalQuota_ });
+        proposalConfig[3] = Graduated({ quorum: DEFAULT_TIER_3_QUORUM, duration: DEFAULT_TIER_3_DURATION, quota: proposalQuota_ });
 
         votingModule = IVotingStrategy(address(new WeightedVotingStrategy(address(this))));
     }
@@ -156,7 +156,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @return Targets, values, signatures, and calldatas of the proposal actions
     **/
     function getActions(uint proposalId) external view returns (address[] memory targets, uint[] memory values, string[] memory signatures, bytes[] memory calldatas) {
-        Proposal storage p = proposals[proposalId];
+        ProposalV2 storage p = proposals[proposalId];
         return (p.targets, p.values, p.signatures, p.calldatas);
     }
 
@@ -166,14 +166,14 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @param voter The address of the voter
       * @return The voting records 
     **/
-    function getRecords(uint proposalId, address voter) external view returns (Record[4] memory) {
-        Proposal storage p = proposals[proposalId];
-        return ( 
+    function getRecords(uint proposalId, address voter) public view returns (Record[4] memory) {
+        ProposalV2 storage p = proposals[proposalId];
+        return [ 
           p.results.primary.records[voter],
           p.results.virtualized.records[voter], 
           p.veto.primary.records[voter],
           p.veto.virtualized.records[voter]
-        ); 
+        ]; 
     }
 
     /**
@@ -186,7 +186,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         Delegate storage d = delegations[delegator];
 
         if (d.expiry < block.timestamp && d.expiry > 0) {
-            return d.expiry == expiry && d.target === delegatee;
+            return d.expiry == expiry && d.target == delegatee;
         } 
         return false; 
     }
@@ -197,13 +197,13 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @return Proposal status 
     **/
     function status(uint256 proposalId) public view returns (ProposalStatus) {
-        Proposal storage p = proposals[proposalId];
+        ProposalV2 storage p = proposals[proposalId];
         ProposalState s = state(proposalId);
-        uint quorumVotes = proposalConfig[proposal.tier].quorum;
+        uint quorumVotes = proposalConfig[p.tier].quorum;
 
         if (s == ProposalState.Canceled || s == ProposalState.Defeated || s == ProposalState.Expired || s == ProposalState.Executed) { 
           return ProposalStatus.Resolved;
-        } else if (p.veto.primary.forVotes > p.veto.primary.againstVotes && p.veto.primary.totalWeight => vetoQuorum) {
+        } else if (p.veto.primary.forVotes > p.veto.primary.againstVotes && p.veto.primary.totalWeight >= vetoQuorum) {
           return ProposalStatus.Dropped;
         } else if (p.contested) {
           return ProposalStatus.Contested;
@@ -219,10 +219,10 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @param proposalId The id of the proposal
       * @return Proposal state
     **/
-    function state(uint proposalId) public view returns (ProposalState, ProposalStatus) {
+    function state(uint proposalId) public view returns (ProposalState) {
         require(proposalCount >= proposalId && proposalId > initialProposalId, "GovernorBravo::state: invalid proposal id");
-        Proposal storage p = proposals[proposalId];
-        uint quorumVotes = proposalConfig[proposal.tier].quorum;
+        ProposalV2 storage p = proposals[proposalId];
+        uint quorumVotes = proposalConfig[p.tier].quorum;
 
         if (p.canceled) {
             return ProposalState.Canceled;
@@ -298,12 +298,12 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         // Reject proposals before initiating as Governor
         require(initialProposalId != 0, "GovernorDelta::propose: Governor not initialized");
         // Allow addresses above proposal threshold and whitelisted addresses to propose
-        require(balance => framework.quota, "GovernorDelta::propose: proposer votes below proposal threshold");
+        require(balance >= framework.quota, "GovernorDelta::propose: proposer votes below proposal threshold");
         require(targets.length == values.length && targets.length == signatures.length && targets.length == calldatas.length, "GovernorDelta::propose: proposal function information arity mismatch");
         require(targets.length != 0, "GovernorDelta::propose: must provide actions");
-        require(targets.length <= proposalMaxOperations, "GovernorDelta::propose: too many actions");
+        require(targets.length <= MAX_PROPOSAL_OPERATIONS, "GovernorDelta::propose: too many actions");
         uint startTs = block.timestamp + votingDelay;
-        uint endTs = startTs + votingPeriod;
+        uint endTs = startTs + _votingPeriod;
         uint latestProposalId = latestProposalIds[msg.sender];
 
         if (latestProposalId != 0) {
@@ -313,7 +313,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         }
 
         proposalCount++;
-        ProposalV2 memory newProposal;
+        ProposalV2 storage newProposal = proposals[proposalCount];
         newProposal.id = proposalCount;
         newProposal.tier = tier;
         newProposal.proposer = msg.sender;
@@ -323,7 +323,6 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         newProposal.calldatas = calldatas;
         newProposal.startTime = startTs;
         newProposal.endTime = endTs;
-        proposals[newProposal.id] = newProposal;
         latestProposalIds[newProposal.proposer] = newProposal.id;
 
         emit ProposalCreated(newProposal.id, tier, msg.sender, targets, values, signatures, calldatas, startTs, endTs, description);
@@ -336,7 +335,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
     **/
     function queue(uint proposalId) external {
         require(state(proposalId) == ProposalState.Succeeded, "GovernorBravo::queue: proposal can only be queued if it is succeeded");
-        Proposal storage proposal = proposals[proposalId];
+        ProposalV2 storage proposal = proposals[proposalId];
 
         for (uint i = 0; i < proposal.targets.length; i++) {
             _queueOrRevert(proposal.targets[i], proposal.values[i], proposal.signatures[i], proposal.calldatas[i], proposal.endTime);
@@ -350,10 +349,10 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @notice Executes a queued proposal if eta has passed
       * @param proposalId The id of the proposal to execute
     **/
-    function execute(uint proposalId) external payable {
+    function execute(uint proposalId) public payable {
         require(state(proposalId) == ProposalState.Queued, "GovernorBravo::execute: proposal can only be executed if it is queued");
         require(status(proposalId) != ProposalStatus.Contested, "GovernorBravo::execute: proposal can only be executed if it is queued");
-        Proposal storage proposal = proposals[proposalId];
+        ProposalV2 storage proposal = proposals[proposalId];
         proposal.executed = true;
 
         for (uint i = 0; i < proposal.targets.length; i++) {
@@ -371,7 +370,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         (uint balance,) = stake(msg.sender);
         require(balance >= vetoQuota, "GovernorDelta::veto: insufficient balance for quota");
         require(state(proposalId) == ProposalState.Queued, "GovernorDelta::veto: proposal can only be executed if it is queued");
-        Proposal storage proposal = proposals[proposalId];
+        ProposalV2 storage proposal = proposals[proposalId];
         proposal.contested = true;
 
         emit ProposalVetoed(proposalId);
@@ -383,7 +382,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
     **/
     function resolve(uint proposalId) external payable {
         require(state(proposalId) == ProposalState.Queued, "GovernorDelta::resolve: proposal can only be resolved if it is queued");
-        Proposal storage proposal = proposals[proposalId];
+        ProposalV2 storage proposal = proposals[proposalId];
  
        if(status(proposalId) == ProposalStatus.Dropped) {
           _dropProposal(proposalId, proposal);
@@ -399,7 +398,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
     **/
     function cancel(uint proposalId) external {
         require(state(proposalId) != ProposalState.Executed, "GovernorBravo::cancel: cannot cancel executed proposal");
-        Proposal storage proposal = proposals[proposalId];
+        ProposalV2 storage proposal = proposals[proposalId];
         require(msg.sender == proposal.proposer, "GovernorDelta::cancel: not admin or proposer");         
         
         _dropProposal(proposalId, proposal);
@@ -424,7 +423,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         id = abi.encode(msg.sender, delegatee, expiry);
 
         _moveDelegates(msg.sender, delegatee, expiry);
-        emit Delegate(msg.sender, delegatee, expiry, keccak256(id));
+        emit Delegation(msg.sender, delegatee, expiry, keccak256(id));
     }
 
     /**
@@ -442,7 +441,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         id = abi.encode(msg.sender, delegatee, expiry);
 
         _moveDelegates(msg.sender, delegatee, expiry);
-        emit Delegate(msg.sender, delegatee, expiry, keccak256(id));
+        emit Delegation(msg.sender, delegatee, expiry, keccak256(id));
     }
 
     /**
@@ -455,7 +454,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         require(delegationActive, "GovernorDelta::revoke: delegation not active");
         require(d.expiry > block.timestamp, "GovernorDelta::revoke: delegation already expired");
 
-        if (!module.virtualized()) {
+        if (!votingModule.virtualized()) {
             require(stakes[msg.sender].unlockTime < block.timestamp, "GovernorDelta::resolve: delegation lock");
         }
 
@@ -492,7 +491,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
     function castVoteBySig(uint proposalId, uint8 support, uint8 v, bytes32 r, bytes32 s) external {
         require(state(proposalId) == ProposalState.Active, "GovernorDelta::castVote: voting is closed");
         bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name)), _getChainId(), address(this)));
-        bytes32 structHash = keccak256(abi.encode(BALLOT_TYPEHASH, proposalId, support));
+        bytes32 structHash = keccak256(abi.encode(VOTE_TYPEHASH, proposalId, support));
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
         address signatory = ecrecover(digest, v, r, s);
         require(signatory != address(0), "GovernorDelta::castVoteBySig: invalid signature");
@@ -584,7 +583,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         for (uint i = 0; i < delegateIds.length; i++) {
             require(checkDelegation(delegateIds[i]), "GovernorDelta::batchAttestVotes: delegation invalid");
             (address delegator, address delegatee, uint256 expiry) = abi.decode(delegateIds[i], (address, address, uint));
-            Proposal storage proposal = proposals[proposalId];
+            ProposalV2 storage proposal = proposals[proposalId];
             Record storage record = proposal.results.virtualized.records[delegator];
             require(record.hasVoted, "GovernorDelta::batchAttestVotes: delegation unspent");
             proposal.results.primary.totalWeight += record.weight;
@@ -605,7 +604,7 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @param veto Whether the vote is a veto vote
     **/
     function _logVote(address voter, uint proposalId, uint8 support, bool veto) internal returns (uint) {
-        Proposal storage proposal = proposals[proposalId];
+        ProposalV2 storage proposal = proposals[proposalId];
         Tally storage tally = !veto ? proposal.results : proposal.veto;
         Ballot storage ballot = tally.primary;
         uint weight = stakes[voter].amount; 
@@ -622,11 +621,11 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
       * @param support The support value for the vote. 0=against, 1=for, 2=abstain
     **/
     function _commitVote(address voter, uint proposalId, uint8 support) internal returns (uint) {
-        Proposal storage proposal = proposals[proposalId];
+        ProposalV2 storage proposal = proposals[proposalId];
         Tally storage tally = proposal.results;
         Ballot storage ballot = tally.virtualized;
 
-        if (!module.virtualized()) ballot = tally.primary;
+        if (!votingModule.virtualized()) ballot = tally.primary;
 
         uint weight = stakes[voter].amount; 
         uint votes = predictedPower(voter, proposal.endTime);
@@ -675,18 +674,6 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
     }
 
     /**
-      * @notice Admin function for setting the proposal threshold
-      * @param newProposalThreshold new proposal threshold
-    **/
-    function _setProposalQuota(uint newProposalQuota) external {
-        require(msg.sender == admin, "GovernorDelta::_setProposalThreshold: admin only");
-        uint oldProposalQuota = proposalQuota;
-        proposalQuota = newProposalQuota;
-
-        emit ProposalQuotaSet(oldProposalQuota, proposalQuota);
-    }
-
-    /**
      * @notice Sets the proposal configuration for all tiers
      * @dev Tier 0 (low) to tier 3 (critical), each with independent quorum and duration
      * @param configs Fixed array of four tier configurations, ordered by severity ascending
@@ -724,14 +711,14 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
         require(msg.sender == admin, "GovernorDelta::_setVetoQuorum: admin only");
         require(newVetoQuorum >= MIN_QUORUM_VOTES, "GovernorDelta::_setVetoQuorum: quorum below minimum");
         uint oldVetoQuorum = vetoQuorum;
-        proposalQuota = newVetoQuorum;
+        vetoQuota = newVetoQuorum;
 
         emit VetoQuorumSet(oldVetoQuorum, vetoQuorum);
     }
 
     function _setVotingModule(address strategy) external {
         require(msg.sender == admin, "GovernorDelta::_setVotingModule: admin only");
-        address previousModule = address(votingModule)
+        address previousModule = address(votingModule);
         votingModule = IVotingStrategy(strategy);
 
         emit NewVotingModule(previousModule, votingModule);
@@ -740,12 +727,12 @@ contract GovernorDelta is IGovernor, GovernorStorageV3 {
     /**
       * @notice Initiate the GovernorDelta contract
       * @dev Admin only. Sets initial proposal id which initiates the contract, ensuring a continuous proposal id count
-      * @param governorAlpha The address for the Governor to continue the proposal id count from
+      * @param governor The address for the Governor to continue the proposal id count from
     **/
     function _initiate(address governor) external {
         require(msg.sender == admin, "GovernorDelta::_initiate: admin only");
         require(initialProposalId == 0, "GovernorDelta::_initiate: can only initiate once");
-        proposalCount = GovernorAlpha(governor).proposalCount();
+        proposalCount = IGovernorAlpha(governor).proposalCount();
         initialProposalId = proposalCount;
         timelock.acceptAdmin();
     }

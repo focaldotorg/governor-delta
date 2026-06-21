@@ -1,4 +1,4 @@
-interface ^0.8.10;
+pragma solidity ^0.8.10;
 
 interface IGovernor {
   
@@ -28,7 +28,7 @@ interface IGovernor {
     event VetoVoteCast(address indexed voter, uint proposalId, uint8 support, uint votes, string reason);
 
     /// @notice Emitted when a virtualized vote is attested and promoted to the primary tally during timelock
-    event VoteAttested(uint256 indexed proposalId, address indexed delegator, address indexed delegatee, uint votes, bytes32 indexed id);
+    event VoteAttested(uint256 indexed proposalId, address delegator, address indexed delegatee, uint votes, bytes32 indexed id);
 
     /// @notice An event emitted when a proposal has been canceled
     event ProposalCanceled(uint id);
@@ -73,7 +73,7 @@ interface IGovernor {
     event NewAdmin(address oldAdmin, address newAdmin);
 
     /// @notice Emitted when an account changes a delegate
-    event Delegate(address indexed delegator, address indexed delegate, uint expiry, bytes32 indexed id);
+    event Delegation(address indexed delegator, address indexed delegate, uint expiry, bytes32 indexed id);
 
     /// @notice Emitted when an account revokes a delegate 
     event Revoke(address indexed delegator, address indexed delegate, uint timeUntilExpiry, bytes32 indexed id);

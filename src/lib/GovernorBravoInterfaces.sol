@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 pragma solidity ^0.8.10;
 
+import "@interfaces/ITimelock.sol";
+import "./GovernorToken.sol";
 
 contract GovernorBravoEvents {
     /// @notice An event emitted when a new proposal is created
@@ -84,10 +86,10 @@ contract GovernorBravoDelegateStorageV1 is GovernorBravoDelegatorStorage {
     uint public proposalCount;
 
     /// @notice The address of the Compound Protocol Timelock
-    TimelockInterface public timelock;
+    ITimelock public timelock;
 
     /// @notice The address of the Compound governance token
-    CompInterface public comp;
+    GovernorToken public comp;
 
     /// @notice The official record of all proposals ever proposed
     mapping (uint => Proposal) public proposals;

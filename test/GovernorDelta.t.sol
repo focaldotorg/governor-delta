@@ -7,9 +7,8 @@ import { ERC20 } from "@openzeppelin/token/ERC20/ERC20.sol";
 
 contract GovernorDeltaTest is Test {
 
-    IERC20 governorToken;
-
-    GovernorDelta public delta;
+    ERC20 governorToken;
+    GovernorDelta delta;
 
     function setUp() public {
       governorToken = new ERC20("", "SHARE", 18);

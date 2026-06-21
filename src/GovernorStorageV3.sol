@@ -3,7 +3,9 @@ pragma solidity ^0.8.10;
 
 import "@interfaces/ITimelock.sol";
 import "@interfaces/IERC20.sol";
+import "@interfaces/IGovernor.sol";
 import "@interfaces/IVotingStrategy.sol";
+import "@interfaces/IGovernorToken.sol";
 
 contract GovernorProxyStorage {
 
@@ -158,7 +160,7 @@ contract GovernorStorageV2 is GovernorStorageV1 {
 
 }
 
-contract GovernorStorageV3 is GovernorEvents, GovernorStorageV2 {
+contract GovernorStorageV3 is IGovernor, GovernorStorageV2 {
 
     /// @notice The basis token or currency of authority 
     IERC20 public canonicalToken;
@@ -185,7 +187,7 @@ contract GovernorStorageV3 is GovernorEvents, GovernorStorageV2 {
     mapping (address => Stake) internal stakes;
 
     /// @notice A record of an account's delegate
-    mapping (address => Delegate) public delegates;
+    mapping (address => Delegate) public delegations;
 
     /// @notice The official record of all proposals ever proposed
     mapping (uint => ProposalV2) internal proposals;

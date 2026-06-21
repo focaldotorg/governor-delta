@@ -1,6 +1,8 @@
 @interfaces/=src/interfaces
 @lib/=src/lib/
 @root/=src/
+@strategies=src/modules/strategies/
+@guards=src/modules/guards
 
 forge-std/=lib/forge-std/src/
 @openzeppelin/=lib/openzeppelin-contracts/contracts/

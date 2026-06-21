@@ -1,6 +1,7 @@
 pragma solidity ^0.8.10;
 
 import "@interfaces/IGovernorDelta.sol";
+import "@interfaces/IVotingStrategy.sol";
 
 contract WeightedVotingStrategy is IVotingStrategy {
 
@@ -20,7 +21,7 @@ contract WeightedVotingStrategy is IVotingStrategy {
     }
 
     function predict(address owner, uint timestamp) public view returns (uint) {
-        return (uint balance,) = governor.stake(owner);
+        (uint balance,) = governor.stake(owner);
         return balance;
     }
 
