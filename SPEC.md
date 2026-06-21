@@ -8,14 +8,10 @@ Bravo predefined all parameters of governance at deployment time, which fundamen
 ### Checkpoints
 Now redacted in Bravo from to the requirement of attesting balances, where stakeholders lock tokens to the contract to signal conviction regressing the need for historic lookups with a checkpoint system. Which while was designed to combat vote-buying, unironically creates the new issue of proposers excercising voting power they may not still retain. As an adversary can create a malicous proposal, vote and then continue to offload the equivalent tokens from the cast voting power on secondary markets, yet still have their weight meaningfully excercised in the ballot. A problem that would be only be exacerbated if a group of actors colluded together.
 
-### Guardian
+### Whitelisting 
 Replaced by the more broad timelock restructuring and possible to implement with the new guard system, it still was an unfavorable design choice of Bravo for more distributed organisations.
 
 ## Configuration
-
-### Default Guards
-
-By default there is no recommended default guards, except for contextual proposal constraints like `ExternalCallGuard` and `InternalCallGuard` by choice of the proposer. Although as a recommended policy, organisations should probably integrate `MaxTransferGuard` as a default guard for their own assurances and operations.
 
 ### Canonical token
 
@@ -41,19 +37,10 @@ Minimum cannoncial token weight to contest a queued proposal.
 
 Minimum cannoncial token weights for proposals by severity to deem consensus.
 
-## Accounting
 
-### Cooldown
+### Guards
 
-When you lock assets into Delta there is a small cooldown period for withdrawing - similar to Bravo.
-
-### Proposal lock
-
-When you create a proposal there is a lock on the quota until the proposal resolves.
-
-### Ballot locks
-
-When you vote on a proposal your equivalent weight is locked until the proposal resolves.
+By default there is no recommended default guards, except for contextual proposal constraints like `ExternalCallGuard` and `InternalCallGuard` by choice of the proposer. Although as a recommended policy, organisations should probably integrate `MaxTransferGuard` as a default guard for their own assurances and operations.
 
 ## Modules
 
