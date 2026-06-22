@@ -106,7 +106,7 @@ contract GovernorDelta is GovernorStorageV3 {
       * @param owner The address to query voting power for
       * @return The voting power of the account 
     **/
-    function votingPower(address owner) public view returns (uint) {
+    function votingPower(address owner) public returns (uint) {
         return votingModule.power(owner);
     }
 
@@ -115,7 +115,7 @@ contract GovernorDelta is GovernorStorageV3 {
       * @param owner The address to query voting power for
       * @return The future voting power of the account 
     **/
-    function predictedPower(address owner, uint timestamp) public view returns (uint) {
+    function predictedPower(address owner, uint timestamp) public returns (uint) {
         return votingModule.predict(owner, timestamp);
     }
 
@@ -125,7 +125,7 @@ contract GovernorDelta is GovernorStorageV3 {
       * @param delegator The address that has delegated their voting power
       * @return The delegated voting power of the account
     **/
-    function delegatedPower(address owner, address delegator) public view returns (uint) {
+    function delegatedPower(address owner, address delegator) public returns (uint) {
         Delegate storage d = delegations[delegator];
 
         if (d.target == owner && block.timestamp < d.expiry)  {
@@ -141,7 +141,7 @@ contract GovernorDelta is GovernorStorageV3 {
       * @param timestamp The time to query voting power at 
       * @return The delegated future voting power of the account
     **/
-    function delegatedPowerAt(address owner, address delegator, uint timestamp) public view returns (uint) {
+    function delegatedPowerAt(address owner, address delegator, uint timestamp) public returns (uint) {
         Delegate storage d = delegations[delegator];
 
         if (d.target == owner && block.timestamp < d.expiry && timestamp <= d.expiry) {
@@ -153,7 +153,10 @@ contract GovernorDelta is GovernorStorageV3 {
     /**
       * @notice Gets actions of a proposal
       * @param proposalId the id of the proposal
-      * @return Targets, values, signatures, and calldatas of the proposal actions
+      * @return targets Targets of proposal actions
+      * @return values Values of proposal actions
+      * @return signatures Function signatures of proposal actions
+      * @return calldatas Raw bytecode calldatas of proposal actions
     **/
     function getActions(uint proposalId) external view returns (address[] memory targets, uint[] memory values, string[] memory signatures, bytes[] memory calldatas) {
         ProposalV2 storage p = proposals[proposalId];
@@ -356,7 +359,7 @@ contract GovernorDelta is GovernorStorageV3 {
         proposal.executed = true;
 
         for (uint i = 0; i < proposal.targets.length; i++) {
-            timelock.executeTransaction.value(proposal.values[i])(proposal.targets[i], proposal.values[i], proposal.signatures[i], proposal.calldatas[i], proposal.eta);
+            timelock.executeTransaction{value: proposal.values[i]}(proposal.targets[i], proposal.values[i], proposal.signatures[i], proposal.calldatas[i], proposal.eta);
         }
 
         emit ProposalExecuted(proposalId);
@@ -560,8 +563,8 @@ contract GovernorDelta is GovernorStorageV3 {
         for (uint i = 0; i < delegateIds.length; i++) {
             require(checkDelegation(delegateIds[i]), "GovernorDelta::castProxyVote: delegation invalid");
             (address delegator, address delegatee,) = abi.decode(delegateIds[i], (address, address, uint256));
-            Record storage receipt = (getRecords(proposalId, delegatee))[0];
-            Record storage record = (getRecords(proposalId, delegator))[1];
+            Record memory receipt = (getRecords(proposalId, delegatee))[0];
+            Record memory record = (getRecords(proposalId, delegator))[1];
             require(receipt.hasVoted, "GovernorDelta::castProxyVote: no intent signalled");
             require(!record.hasVoted, "GovernorDelta::castProxyVote: delegation spent");
             uint votes = _commitVote(delegator, proposalId, receipt.support);
@@ -607,7 +610,8 @@ contract GovernorDelta is GovernorStorageV3 {
         ProposalV2 storage proposal = proposals[proposalId];
         Tally storage tally = !veto ? proposal.results : proposal.veto;
         Ballot storage ballot = tally.primary;
-        uint weight = stakes[voter].amount; 
+        Stake storage stake = stakes[voter];
+        uint weight = stake.amount; 
         uint votes = predictedPower(voter, proposal.endTime);
         stake.unlockTime = !veto ? proposal.endTime : proposal.eta;
  
@@ -624,10 +628,11 @@ contract GovernorDelta is GovernorStorageV3 {
         ProposalV2 storage proposal = proposals[proposalId];
         Tally storage tally = proposal.results;
         Ballot storage ballot = tally.virtualized;
+        Stake storage stake = stakes[voter];
 
         if (!votingModule.virtualized()) ballot = tally.primary;
 
-        uint weight = stakes[voter].amount; 
+        uint weight = stake.amount; 
         uint votes = predictedPower(voter, proposal.endTime);
         stake.unlockTime = proposal.endTime;
 
@@ -670,7 +675,7 @@ contract GovernorDelta is GovernorStorageV3 {
         uint oldVotingDelay = votingDelay;
         votingDelay = newVotingDelay;
 
-        emit VotingDelaySet(oldVotingDelay,votingDelay);
+        emit VotingDelaySet(oldVotingDelay, votingDelay);
     }
 
     /**
@@ -716,12 +721,12 @@ contract GovernorDelta is GovernorStorageV3 {
         emit VetoQuorumSet(oldVetoQuorum, vetoQuorum);
     }
 
-    function _setVotingModule(address strategy) external {
+    function _setVotingModule(address votingStrategy) external {
         require(msg.sender == admin, "GovernorDelta::_setVotingModule: admin only");
         address previousModule = address(votingModule);
-        votingModule = IVotingStrategy(strategy);
+        votingModule = IVotingStrategy(votingStrategy);
 
-        emit NewVotingModule(previousModule, votingModule);
+        emit NewVotingModule(previousModule, votingStrategy);
     }
 
     /**
@@ -792,7 +797,7 @@ contract GovernorDelta is GovernorStorageV3 {
         }
     } 
 
-    function _dropProposal(uint proposalId, ProposalV2 memory proposal) internal {
+    function _dropProposal(uint proposalId, ProposalV2 storage proposal) internal {
         proposal.canceled = true;
 
         for (uint i = 0; i < proposal.targets.length; i++) {
@@ -800,7 +805,7 @@ contract GovernorDelta is GovernorStorageV3 {
         }
     }
 
-    function _getChainId() internal pure returns (uint) {
+    function _getChainId() internal view returns (uint) {
         uint chainId;
         assembly { chainId := chainid() }
 

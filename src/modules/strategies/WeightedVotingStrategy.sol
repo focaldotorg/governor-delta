@@ -11,21 +11,21 @@ contract WeightedVotingStrategy is IVotingStrategy {
         governor = IGovernorDelta(delta_);
     }
 
-    function virtualization() public view returns (bool) {
+    function virtualized() external returns (bool) {
         return false;
     }
 
-    function power(address owner) public view returns (uint) {
+    function power(address owner) external returns (uint) {
         (uint balance,) = governor.stake(owner);
         return balance;
     }
 
-    function predict(address owner, uint timestamp) public view returns (uint) {
+    function predict(address owner, uint timestamp) external returns (uint) {
         (uint balance,) = governor.stake(owner);
         return balance;
     }
 
-    function weight(address owner) public view returns (uint) {
+    function weight(address owner) external returns (uint) {
         (uint balance,) = governor.stake(owner);
         return balance;
     }

@@ -296,10 +296,10 @@ contract GovernorStorageV3 is IGovernor, GovernorStorageV2 {
         bool hasVoted;
 
         /// @notice Whether or not the voter supports the proposal or abstains
-        uint8 decision;
+        uint8 support;
 
         /// @notice The number of votes the voter had, which were cast
-        uint power;
+        uint votes;
 
         /// @notice The number of tokens the voter had, which were cast 
         uint weight;
