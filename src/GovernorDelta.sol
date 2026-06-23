@@ -33,26 +33,14 @@ contract GovernorDelta is GovernorStorageV3 {
     /// @notice Proposal tier 0 (low) minimum canonical weight
     uint public constant DEFAULT_TIER_0_QUORUM = 10000e18;
 
-    /// @notice Proposal tier 0 (low) voting duration
-    uint public constant DEFAULT_TIER_0_DURATION = 7 days;
-
     /// @notice Proposal tier 1 (medium) minimum canonical weight
     uint public constant DEFAULT_TIER_1_QUORUM = 15000e18;
-
-    /// @notice Proposal tier 1 (medium) voting duration
-    uint public constant DEFAULT_TIER_1_DURATION = 18 days;
 
     /// @notice Proposal tier 2 (high) minimum canonical weight
     uint public constant DEFAULT_TIER_2_QUORUM = 33000e18;
 
-    /// @notice Proposal tier 2 (high) voting duration
-    uint public constant DEFAULT_TIER_2_DURATION = 38 days;
-
     /// @notice Proposal tier 3 (critical) minimum canonical weight
     uint public constant DEFAULT_TIER_3_QUORUM = 51000e18;
-
-    /// @notice Proposal tier 3 (critical) voting duration
-    uint public constant DEFAULT_TIER_3_DURATION = 91 days;
 
     /// @notice The EIP-712 typehash for the contract's domain
     bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
@@ -82,10 +70,10 @@ contract GovernorDelta is GovernorStorageV3 {
         votingDelay = votingDelay_;
         timelock = ITimelock(timelock_);
         canonicalToken = IERC20(token_);
-        proposalConfig[0] = Graduated({ quorum: DEFAULT_TIER_0_QUORUM, duration: DEFAULT_TIER_0_DURATION, quota: proposalQuota_ });
-        proposalConfig[1] = Graduated({ quorum: DEFAULT_TIER_1_QUORUM, duration: DEFAULT_TIER_1_DURATION, quota: proposalQuota_ });
-        proposalConfig[2] = Graduated({ quorum: DEFAULT_TIER_2_QUORUM, duration: DEFAULT_TIER_2_DURATION, quota: proposalQuota_ });
-        proposalConfig[3] = Graduated({ quorum: DEFAULT_TIER_3_QUORUM, duration: DEFAULT_TIER_3_DURATION, quota: proposalQuota_ });
+        proposalConfig[0] = Graduated({ quorum: DEFAULT_TIER_0_QUORUM, duration: votingPeriod_, quota: proposalQuota_ });
+        proposalConfig[1] = Graduated({ quorum: DEFAULT_TIER_1_QUORUM, duration: votingPeriod_, quota: proposalQuota_ });
+        proposalConfig[2] = Graduated({ quorum: DEFAULT_TIER_2_QUORUM, duration: votingPeriod_, quota: proposalQuota_ });
+        proposalConfig[3] = Graduated({ quorum: DEFAULT_TIER_3_QUORUM, duration: votingPeriod_, quota: proposalQuota_ });
 
         votingModule = IVotingStrategy(address(new WeightedVotingStrategy(address(this))));
     }
