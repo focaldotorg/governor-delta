@@ -42,15 +42,14 @@ contract GovernorDelta is GovernorStorageV3 {
     /// @notice Proposal tier 3 (critical) minimum canonical weight
     uint public constant DEFAULT_TIER_3_QUORUM = 51000e18;
 
-    /// @notice The EIP-712 typehash for the contract's domain
-    bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
-
     /// @notice The EIP-712 typehash for the vote struct used by the contract
     bytes32 public constant VOTE_TYPEHASH = keccak256("Vote(uint256 proposalId,uint8 support)");
 
     /// @notice The EIP-712 typehash for the veto struct used by the contract
     bytes32 public constant VETO_TYPEHASH = keccak256("VetoVote(uint256 proposalId,uint8 support)");
 
+    /// @notice The EIP-712 typehash for the contract's domain
+    bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
 
     /**
       * @notice Used to initialize the contract during delegator constructor

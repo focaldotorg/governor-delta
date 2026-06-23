@@ -7,12 +7,13 @@ import { Timelock } from "@lib/Timelock.sol";
 
 import { TestERC20 } from "./mock/TestERC20.sol";
 
-contract GovernorDeltaTest is Test {
+contract GovernorBaseTest is Test {
 
+    Timelock timelock;
     GovernorDelta governor;
+    TestERC20 treasuryToken;
     TestERC20 governorToken;
-    Timelock governorTimelock;
-
+    
     uint public constant DEFAULT_VOTING_PERIOD = 3 days;
     uint public constant DEFAULT_VOTING_DELAY = 1 days; 
     uint public constant DEFAULT_TIER_0_QUORUM = 10000e18;
@@ -25,5 +26,37 @@ contract GovernorDeltaTest is Test {
     uint public constant DEFAULT_TIER_3_DURATION = 91 days;
 
     function setUp() public {}
+
+    function testLockSystem() public {}
+
+    function testStakeTimeCoeff() public {}
+
+    function testSetVetoQuota() public {}
+
+    function testSetVetoQuorum() public {}
+
+    function testChangeAdmin() public {}
+
+    function testSetProposalConfig() public {}
+
+    function testValidProposal() public {}
+
+    function testDefeatedProposal public {}
+
+    function testExpiredProposal() public {}
+
+    function testContestedProposal() public {}
+
+    function testVetoedProposal() public {}
+
+    function testCancelledProposal() public {}
+
+    function testVoteBySig() public {}
+
+    function testVetoVoteBySig() public {}
+
+    function testProxyVote() public {}
+
+    function testDelegationActivation() public {}
 
 }
