@@ -5,7 +5,7 @@ import { Test, console } from "forge-std/Test.sol";
 import { GovernorDelta } from "@root/GovernorDelta.sol";
 import { ERC20 } from "@openzeppelin/token/ERC20/ERC20.sol";
 
-contract TestToken is ERC20 {
+contract TestERC20 is ERC20 {
 
     constructor() ERC20("", "SHARE") {}
 
