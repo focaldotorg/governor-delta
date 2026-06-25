@@ -327,10 +327,10 @@ contract GovernorDelta is GovernorStorageV3 {
         require(state(proposalId) == ProposalState.Succeeded, "GovernorBravo::queue: proposal can only be queued if it is succeeded");
         ProposalV2 storage proposal = proposals[proposalId];
 
-        for (uint i = 0; i < proposal.targets.length; i++) {
-            _queueOrRevert(proposal.targets[i], proposal.values[i], proposal.signatures[i], proposal.calldatas[i], proposal.endTime);
-        }
         proposal.eta = block.timestamp + timelock.delay();
+        for (uint i = 0; i < proposal.targets.length; i++) {
+            _queueOrRevert(proposal.targets[i], proposal.values[i], proposal.signatures[i], proposal.calldatas[i], proposal.eta);
+        }
         
         emit ProposalQueued(proposalId, proposal.eta);
     }
