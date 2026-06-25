@@ -11,10 +11,10 @@ contract GovernorAdmin is GovernorDelta {
         admin = msg.sender;
     }
 
-    function acceptAdmin() external {
+    function acceptAdmin(address timelock) external {
         address oldAdmin = admin;
         address oldPendingAdmin = pendingAdmin;
-        admin = pendingAdmin;
+        admin = timelock;
         pendingAdmin = address(0);
 
         emit NewAdmin(oldAdmin, admin);
@@ -26,7 +26,7 @@ contract GovernorAdmin is GovernorDelta {
         require(initialProposalId == 0, "GovernorDelta::_initiate: can only initiate once");
         proposalCount = 1;
         initialProposalId = 1;
-        RelaxedTimelock(payable(address(timelock))).revokeAdmin();
+        RelaxedTimelock(payable(address(timelock))).revokeAdmin(address(this));
     }
 
 }

@@ -14,13 +14,13 @@ contract GovernorBaseTest is Test {
     TestERC20 treasuryToken;
     TestERC20 governorToken;
   
-    uint public constant STAKEHOLDER_MINOR = 45000 ether;
-    uint public constant STAKEHOLDER_MAJOR = 10000 ether;
+    uint public constant STAKEHOLDER_MAJOR = 45000 ether;
+    uint public constant STAKEHOLDER_MINOR = 10000 ether;
     uint public constant TREASURY_RESERVE = 20000 ether;
     uint public constant DEFAULT_PROPOSAL_QUOTA = 1000 ether;
     uint public constant DEFAULT_VOTING_PERIOD = 3 days;
     uint public constant DEFAULT_VOTING_DELAY = 2 days;
-    uint public constant DEFAULT_TIMELOCK_DELAY = 2 days;
+    uint public constant DEFAULT_TIMELOCK_DELAY = 1 days;
 
     uint public constant DEFAULT_TIER_0_QUOTA = 5000e18;
     uint public constant DEFAULT_TIER_0_QUORUM = 500e18;
@@ -56,7 +56,7 @@ contract GovernorBaseTest is Test {
         governor.initialize(address(timelock), address(governorToken), DEFAULT_VOTING_PERIOD, DEFAULT_VOTING_DELAY, DEFAULT_PROPOSAL_QUOTA);
         governor._setPendingAdmin(address(governor));
         governor.initiate(address(governor));
-        governor.acceptAdmin();
+        governor.acceptAdmin(address(timelock));
     }
 
     function testLockSystem() public {
@@ -85,15 +85,15 @@ contract GovernorBaseTest is Test {
 
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
-        governor.unlock(500 ether);
+        governor.unlock(500e18);
         vm.stopPrank();
         /* -------------------------------- */
 
         uint balanceLast = governorToken.balanceOf(STAKEHOLDER_PRIMARY);
         (uint stakeLast, uint deltaTimeLast) = governor.stake(STAKEHOLDER_PRIMARY);
 
-        require(balanceLast == 500 ether);
-        require(stakeLast == 1000 ether);
+        require(balanceLast == 500e18);
+        require(stakeLast == 44500e18);
         require(deltaTimeLast == (block.timestamp - beforeTs) * STAKEHOLDER_MAJOR);
     }
 
@@ -105,7 +105,7 @@ contract GovernorBaseTest is Test {
 
         values[0] = 0;
         targets[0] = address(governor);
-        signatures[0] = "activateDelegation()";
+        signatures[0] = "_activateDelegation()";
         calldatas[0] = "";
 
         /* ------PRIMARY-STAKEHOLDER------- */
@@ -120,7 +120,7 @@ contract GovernorBaseTest is Test {
         governor.castVote(2, 1, "");
 
         // Let proposal finalise
-        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD + DEFAULT_TIMELOCK_DELAY);
 
         governor.queue(2);
 
@@ -128,7 +128,6 @@ contract GovernorBaseTest is Test {
         vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY);
 
         governor.execute(2);
-
         vm.stopPrank();
         /* -------------------------------- */
     }

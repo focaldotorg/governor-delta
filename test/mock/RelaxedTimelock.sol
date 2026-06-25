@@ -7,8 +7,8 @@ contract RelaxedTimelock is Timelock {
 
     constructor(address admin, uint delay) Timelock(admin, delay) {}
 
-    function revokeAdmin() public {
-        admin = address(this);
+    function revokeAdmin(address governor) public {
+        admin = governor;
 
         emit NewAdmin(admin);
     } 
