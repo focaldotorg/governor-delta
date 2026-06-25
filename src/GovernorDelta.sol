@@ -293,7 +293,7 @@ contract GovernorDelta is GovernorStorageV3 {
         require(targets.length != 0, "GovernorDelta::propose: must provide actions");
         require(targets.length <= MAX_PROPOSAL_OPERATIONS, "GovernorDelta::propose: too many actions");
         uint startTs = block.timestamp + votingDelay;
-        uint endTs = startTs + _votingPeriod;
+        uint endTs = startTs + framework.duration;
         uint latestProposalId = latestProposalIds[msg.sender];
 
         if (latestProposalId != 0) {
