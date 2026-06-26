@@ -3,6 +3,8 @@ pragma solidity ^0.8.13;
 
 import { Test, console } from "forge-std/Test.sol";
 
+import { GovernorStorageV3, GovernorStorageV1 } from "@root/GovernorStorageV3.sol";
+
 import { GovernorAdmin } from "./mock/GovernorAdmin.sol";
 import { TestERC20 } from "./mock/TestERC20.sol";
 import { RelaxedTimelock } from "./mock/RelaxedTimelock.sol";
@@ -15,15 +17,15 @@ contract GovernorBaseTest is Test {
     TestERC20 governorToken;
   
     uint public constant STAKEHOLDER_MAJOR = 45000 ether;
-    uint public constant STAKEHOLDER_MINOR = 10000 ether;
+    uint public constant STAKEHOLDER_MINOR = 5000 ether;
     uint public constant TREASURY_RESERVE = 20000 ether;
     uint public constant DEFAULT_PROPOSAL_QUOTA = 1000 ether;
     uint public constant DEFAULT_VOTING_PERIOD = 3 days;
     uint public constant DEFAULT_VOTING_DELAY = 2 days;
     uint public constant DEFAULT_TIMELOCK_DELAY = 1 days;
 
-    uint public constant DEFAULT_TIER_0_QUOTA = 5000e18;
-    uint public constant DEFAULT_TIER_0_QUORUM = 500e18;
+    uint public constant DEFAULT_TIER_0_QUORUM = 10000e18;
+    uint public constant DEFAULT_TIER_0_QUOTA = 500e18;
     uint public constant DEFAULT_TIER_0_DURATION = 7 days;
     uint public constant DEFAULT_TIER_1_QUORUM = 15000e18;
     uint public constant DEFAULT_TIER_1_QUOTA =1000e18;
@@ -97,6 +99,94 @@ contract GovernorBaseTest is Test {
         require(deltaTimeLast == (block.timestamp - beforeTs) * STAKEHOLDER_MAJOR);
     }
 
+    function testInvalidProposal() public {
+        address[] memory targets = new address[](1);
+        string[] memory signatures = new string[](1);
+        bytes[] memory calldatas = new bytes[](1);
+        uint[] memory values = new uint[](1);
+
+        values[0] = 0;
+        targets[0] = address(governor);
+        signatures[0] = "_activateDelegation()";
+        calldatas[0] = "";
+
+        /* ------TERNARY-STAKEHOLDER------- */
+        vm.startPrank(STAKEHOLDER_TERNARY);
+        governorToken.approve(address(governor), STAKEHOLDER_MINOR);
+        governor.lock(STAKEHOLDER_MINOR);
+        governor.propose(0, targets, values, signatures, calldatas, "");
+
+        // Factor for voting delay
+        vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
+
+        governor.castVote(2, 1, "");
+
+        // Let proposal finalise
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD + DEFAULT_TIMELOCK_DELAY);
+
+        GovernorStorageV1.ProposalState endState = governor.state(2); 
+        GovernorStorageV3.ProposalStatus endStatus = governor.status(2);
+        require(endState == GovernorStorageV1.ProposalState.Defeated);
+        require(endStatus == GovernorStorageV3.ProposalStatus.Unqualified);
+        vm.expectRevert();
+        governor.queue(2);
+        vm.stopPrank();
+        /* -------------------------------- */
+    }
+
+    function testDefeatedProposal() public {
+        address[] memory targets = new address[](1);
+        string[] memory signatures = new string[](1);
+        bytes[] memory calldatas = new bytes[](1);
+        uint[] memory values = new uint[](1);
+
+        values[0] = 0;
+        targets[0] = address(governor);
+        signatures[0] = "_activateDelegation()";
+        calldatas[0] = "";
+
+        /* ------TERNARY-STAKEHOLDER------- */
+        vm.startPrank(STAKEHOLDER_TERNARY);
+        governorToken.approve(address(governor), STAKEHOLDER_MINOR);
+        governor.lock(STAKEHOLDER_MINOR);
+        governor.propose(0, targets, values, signatures, calldatas, "");
+
+        // Factor for voting delay
+        vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
+
+        governor.castVote(2, 1, "");
+        /* -------------------------------- */
+
+        /* ------SECONDARY-STAKEHOLDER------- */
+        vm.startPrank(STAKEHOLDER_SECONDARY);
+        governorToken.approve(address(governor), STAKEHOLDER_MAJOR);
+        governor.lock(STAKEHOLDER_MAJOR);
+        governor.castVote(2, 0, "");
+        vm.stopPrank();
+        /* -------------------------------- */
+
+
+       /* ------PRIMARY-STAKEHOLDER------- */
+        vm.startPrank(STAKEHOLDER_PRIMARY);
+        governorToken.approve(address(governor), STAKEHOLDER_MAJOR);
+        governor.lock(STAKEHOLDER_MAJOR);
+        governor.castVote(2, 0, "");
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        // Let proposal finalise
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD + DEFAULT_TIMELOCK_DELAY);
+
+        vm.expectRevert();
+        governor.queue(2);
+
+        GovernorStorageV1.ProposalState endState = governor.state(2); 
+        GovernorStorageV3.ProposalStatus endStatus = governor.status(2);
+        require(endState == GovernorStorageV1.ProposalState.Defeated);
+        require(endStatus == GovernorStorageV3.ProposalStatus.Qualified);
+        vm.stopPrank();
+    }
+
     function testValidProposal() public {
         address[] memory targets = new address[](1);
         string[] memory signatures = new string[](1);
@@ -120,7 +210,7 @@ contract GovernorBaseTest is Test {
         governor.castVote(2, 1, "");
 
         // Let proposal finalise
-        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD + DEFAULT_TIMELOCK_DELAY);
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
 
         governor.queue(2);
 
@@ -132,15 +222,186 @@ contract GovernorBaseTest is Test {
         /* -------------------------------- */
     }
 
-    function testDefeatedProposal() public {}
+    function testExpiredProposal() public {
+        address[] memory targets = new address[](1);
+        string[] memory signatures = new string[](1);
+        bytes[] memory calldatas = new bytes[](1);
+        uint[] memory values = new uint[](1);
 
-    function testExpiredProposal() public {}
+        values[0] = 0;
+        targets[0] = address(governor);
+        signatures[0] = "_activateDelegation()";
+        calldatas[0] = "";
 
-    function testContestedProposal() public {}
+        /* ------PRIMARY-STAKEHOLDER------- */
+        vm.startPrank(STAKEHOLDER_PRIMARY);
+        governorToken.approve(address(governor), STAKEHOLDER_MAJOR);
+        governor.lock(STAKEHOLDER_MAJOR);
+        governor.propose(0, targets, values, signatures, calldatas, "");
 
-    function testVetoedProposal() public {}
+        // Factor for voting delay
+        vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
-    function testCancelledProposal() public {}
+        governor.castVote(2, 1, "");
+
+        // Let proposal finalise
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
+
+        governor.queue(2);
+
+        // Let proposal finalise
+        vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + timelock.GRACE_PERIOD());
+        vm.expectRevert();
+        governor.execute(2);
+
+        GovernorStorageV1.ProposalState endState = governor.state(2); 
+        require(endState == GovernorStorageV1.ProposalState.Expired);
+        vm.stopPrank();
+    }
+
+    function testContestedProposal() public {
+        address[] memory targets = new address[](1);
+        string[] memory signatures = new string[](1);
+        bytes[] memory calldatas = new bytes[](1);
+        uint[] memory values = new uint[](1);
+
+        values[0] = 0;
+        targets[0] = address(governor);
+        signatures[0] = "_activateDelegation()";
+        calldatas[0] = "";
+
+        /* ------PRIMARY-STAKEHOLDER------- */
+        vm.startPrank(STAKEHOLDER_PRIMARY);
+        governorToken.approve(address(governor), STAKEHOLDER_MAJOR);
+        governor.lock(STAKEHOLDER_MAJOR);
+        governor.propose(0, targets, values, signatures, calldatas, "");
+
+        // Factor for voting delay
+        vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
+
+        governor.castVote(2, 1, "");
+
+        // Let proposal finalise
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
+
+        governor.queue(2);
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        // Let proposal finalise
+        vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + 1 hours);
+
+        /* ------TERNARY-STAKEHOLDER------- */
+        vm.startPrank(STAKEHOLDER_TERNARY);
+        governorToken.approve(address(governor), STAKEHOLDER_MINOR);
+        governor.lock(STAKEHOLDER_MINOR);
+
+        governor.veto(2);
+        governor.castVetoVote(2, 0, "");
+
+        GovernorStorageV3.ProposalStatus priorStatus = governor.status(2); 
+        require(priorStatus == GovernorStorageV3.ProposalStatus.Contested);
+
+        vm.warp(block.timestamp + timelock.GRACE_PERIOD());
+        vm.expectRevert();
+        governor.execute(2);
+
+        GovernorStorageV1.ProposalState endState = governor.state(2); 
+        GovernorStorageV3.ProposalStatus endStatus = governor.status(2); 
+        require(endStatus == GovernorStorageV3.ProposalStatus.Resolved);
+        require(endState == GovernorStorageV1.ProposalState.Succeeded);
+        vm.stopPrank();
+        /* -------------------------------- */
+    }
+
+    function testVetoedProposal() public {
+        address[] memory targets = new address[](1);
+        string[] memory signatures = new string[](1);
+        bytes[] memory calldatas = new bytes[](1);
+        uint[] memory values = new uint[](1);
+
+        values[0] = 0;
+        targets[0] = address(governor);
+        signatures[0] = "_activateDelegation()";
+        calldatas[0] = "";
+
+        /* ------PRIMARY-STAKEHOLDER------- */
+        vm.startPrank(STAKEHOLDER_PRIMARY);
+        governorToken.approve(address(governor), STAKEHOLDER_MAJOR);
+        governor.lock(STAKEHOLDER_MAJOR);
+        governor.propose(0, targets, values, signatures, calldatas, "");
+
+        // Factor for voting delay
+        vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
+
+        governor.castVote(2, 1, "");
+
+        // Let proposal finalise
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
+
+        governor.queue(2);
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        // Let proposal finalise
+        vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + 1 hours);
+
+        /* ------TERNARY-STAKEHOLDER------- */
+        vm.startPrank(STAKEHOLDER_TERNARY);
+        governorToken.approve(address(governor), STAKEHOLDER_MINOR);
+        governor.lock(STAKEHOLDER_MINOR);
+
+        governor.veto(2);
+        governor.castVetoVote(2, 1, "");
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        /* ------PRIMARY-STAKEHOLDER------- */
+        vm.startPrank(STAKEHOLDER_SECONDARY);
+        governorToken.approve(address(governor), STAKEHOLDER_MAJOR);
+        governor.lock(STAKEHOLDER_MAJOR);
+        governor.castVetoVote(2, 1, "");
+        vm.stopPrank();
+        /* -------------------------------- */
+        
+        GovernorStorageV3.ProposalStatus priorStatus = governor.status(2); 
+        require(priorStatus == GovernorStorageV3.ProposalStatus.Contested);
+
+        governor.resolve(2);
+
+        GovernorStorageV1.ProposalState endState = governor.state(2);
+        GovernorStorageV3.ProposalStatus endStatus = governor.status(2);
+        require(endStatus == GovernorStorageV3.ProposalStatus.Resolved);
+        require(endState == GovernorStorageV1.ProposalState.Canceled);
+    }
+
+    function testCancelledProposal() public {
+        address[] memory targets = new address[](1);
+        string[] memory signatures = new string[](1);
+        bytes[] memory calldatas = new bytes[](1);
+        uint[] memory values = new uint[](1);
+
+        values[0] = 0;
+        targets[0] = address(governor);
+        signatures[0] = "_activateDelegation()";
+        calldatas[0] = "";
+
+        /* ------PRIMARY-STAKEHOLDER------- */
+        vm.startPrank(STAKEHOLDER_PRIMARY);
+        governorToken.approve(address(governor), STAKEHOLDER_MAJOR);
+        governor.lock(STAKEHOLDER_MAJOR);
+        governor.propose(0, targets, values, signatures, calldatas, "");
+
+        // Factor for voting delay
+        vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
+
+        governor.cancel(2);
+        
+        GovernorStorageV1.ProposalState endState = governor.state(2);
+        GovernorStorageV3.ProposalStatus endStatus = governor.status(2);
+        require(endStatus == GovernorStorageV3.ProposalStatus.Resolved);
+        require(endState == GovernorStorageV1.ProposalState.Canceled);
+    }
 
     function testVoteBySig() public {}
 
