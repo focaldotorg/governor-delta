@@ -46,7 +46,7 @@ contract GovernorBaseTest is Test {
         governorToken = new TestERC20();
         governor = new GovernorAdmin();
         timelock = new RelaxedTimelock(msg.sender, DEFAULT_TIMELOCK_DELAY);
-
+        // Distribute assets
         treasuryToken.mint(address(timelock), TREASURY_RESERVE);
         governorToken.mint(STAKEHOLDER_PRIMARY, STAKEHOLDER_MAJOR);
         governorToken.mint(STAKEHOLDER_SECONDARY, STAKEHOLDER_MAJOR);
@@ -97,21 +97,11 @@ contract GovernorBaseTest is Test {
     }
 
     function testInvalidProposal() public {
-        address[] memory targets = new address[](1);
-        string[] memory signatures = new string[](1);
-        bytes[] memory calldatas = new bytes[](1);
-        uint[] memory values = new uint[](1);
-
-        values[0] = 0;
-        targets[0] = address(governor);
-        signatures[0] = "_activateDelegation()";
-        calldatas[0] = "";
-
         /* ------TERNARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_TERNARY);
         governorToken.approve(address(governor), STAKEHOLDER_MINOR);
         governor.lock(STAKEHOLDER_MINOR);
-        governor.propose(0, targets, values, signatures, calldatas, "");
+        pushMockProposal();
 
         // Factor for voting delay
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
@@ -119,7 +109,7 @@ contract GovernorBaseTest is Test {
         governor.castVote(2, 1, "");
 
         // Let proposal finalise
-        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD + DEFAULT_TIMELOCK_DELAY);
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
 
         GovernorStorageV1.ProposalState endState = governor.state(2); 
         GovernorStorageV3.ProposalStatus endStatus = governor.status(2);
@@ -132,23 +122,11 @@ contract GovernorBaseTest is Test {
     }
 
     function testDefeatedProposal() public {
-        address[] memory targets = new address[](1);
-        string[] memory signatures = new string[](1);
-        bytes[] memory calldatas = new bytes[](1);
-        uint[] memory values = new uint[](1);
-
-        values[0] = 0;
-        targets[0] = address(governor);
-        signatures[0] = "_activateDelegation()";
-        calldatas[0] = "";
-
         /* ------TERNARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_TERNARY);
-        governorToken.approve(address(governor), STAKEHOLDER_MINOR);
-        governor.lock(STAKEHOLDER_MINOR);
-        governor.propose(0, targets, values, signatures, calldatas, "");
+        approveAndLock(STAKEHOLDER_MINOR);
+        pushMockProposal();
 
-        // Factor for voting delay
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
         governor.castVote(2, 1, "");
@@ -156,23 +134,19 @@ contract GovernorBaseTest is Test {
 
         /* ------SECONDARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_SECONDARY);
-        governorToken.approve(address(governor), STAKEHOLDER_MAJOR);
-        governor.lock(STAKEHOLDER_MAJOR);
+        approveAndLock(STAKEHOLDER_MAJOR);
         governor.castVote(2, 0, "");
         vm.stopPrank();
         /* -------------------------------- */
-
 
        /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
-        governorToken.approve(address(governor), STAKEHOLDER_MAJOR);
-        governor.lock(STAKEHOLDER_MAJOR);
+        approveAndLock(STAKEHOLDER_MAJOR);
         governor.castVote(2, 0, "");
         vm.stopPrank();
         /* -------------------------------- */
 
-        // Let proposal finalise
-        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD + DEFAULT_TIMELOCK_DELAY);
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
 
         vm.expectRevert();
         governor.queue(2);
@@ -185,33 +159,19 @@ contract GovernorBaseTest is Test {
     }
 
     function testValidProposal() public {
-        address[] memory targets = new address[](1);
-        string[] memory signatures = new string[](1);
-        bytes[] memory calldatas = new bytes[](1);
-        uint[] memory values = new uint[](1);
-
-        values[0] = 0;
-        targets[0] = address(governor);
-        signatures[0] = "_activateDelegation()";
-        calldatas[0] = "";
-
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
-        governorToken.approve(address(governor), STAKEHOLDER_MAJOR);
-        governor.lock(STAKEHOLDER_MAJOR);
-        governor.propose(0, targets, values, signatures, calldatas, "");
+        approveAndLock(STAKEHOLDER_MAJOR);
+        pushMockProposal();
 
-        // Factor for voting delay
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
         governor.castVote(2, 1, "");
 
-        // Let proposal finalise
         vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
 
         governor.queue(2);
 
-        // Let proposal finalise
         vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY);
 
         governor.execute(2);
@@ -220,34 +180,21 @@ contract GovernorBaseTest is Test {
     }
 
     function testExpiredProposal() public {
-        address[] memory targets = new address[](1);
-        string[] memory signatures = new string[](1);
-        bytes[] memory calldatas = new bytes[](1);
-        uint[] memory values = new uint[](1);
-
-        values[0] = 0;
-        targets[0] = address(governor);
-        signatures[0] = "_activateDelegation()";
-        calldatas[0] = "";
-
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
-        governorToken.approve(address(governor), STAKEHOLDER_MAJOR);
-        governor.lock(STAKEHOLDER_MAJOR);
-        governor.propose(0, targets, values, signatures, calldatas, "");
+        approveAndLock(STAKEHOLDER_MAJOR);
+        pushMockProposal();
 
-        // Factor for voting delay
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
         governor.castVote(2, 1, "");
 
-        // Let proposal finalise
         vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
 
         governor.queue(2);
 
-        // Let proposal finalise
         vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + timelock.GRACE_PERIOD());
+
         vm.expectRevert();
         governor.execute(2);
 
@@ -257,42 +204,26 @@ contract GovernorBaseTest is Test {
     }
 
     function testContestedProposal() public {
-        address[] memory targets = new address[](1);
-        string[] memory signatures = new string[](1);
-        bytes[] memory calldatas = new bytes[](1);
-        uint[] memory values = new uint[](1);
-
-        values[0] = 0;
-        targets[0] = address(governor);
-        signatures[0] = "_activateDelegation()";
-        calldatas[0] = "";
-
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
-        governorToken.approve(address(governor), STAKEHOLDER_MAJOR);
-        governor.lock(STAKEHOLDER_MAJOR);
-        governor.propose(0, targets, values, signatures, calldatas, "");
+        approveAndLock(STAKEHOLDER_MAJOR);
+        pushMockProposal();
 
-        // Factor for voting delay
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
         governor.castVote(2, 1, "");
 
-        // Let proposal finalise
         vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
 
         governor.queue(2);
         vm.stopPrank();
         /* -------------------------------- */
 
-        // Let proposal finalise
         vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + 1 hours);
 
         /* ------TERNARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_TERNARY);
-        governorToken.approve(address(governor), STAKEHOLDER_MINOR);
-        governor.lock(STAKEHOLDER_MINOR);
-
+        approveAndLock(STAKEHOLDER_MINOR);
         governor.veto(2);
         governor.castVetoVote(2, 0, "");
 
@@ -313,41 +244,26 @@ contract GovernorBaseTest is Test {
     }
 
     function testVetoedProposal() public {
-        address[] memory targets = new address[](1);
-        string[] memory signatures = new string[](1);
-        bytes[] memory calldatas = new bytes[](1);
-        uint[] memory values = new uint[](1);
-
-        values[0] = 0;
-        targets[0] = address(governor);
-        signatures[0] = "_activateDelegation()";
-        calldatas[0] = "";
-
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
-        governorToken.approve(address(governor), STAKEHOLDER_MAJOR);
-        governor.lock(STAKEHOLDER_MAJOR);
-        governor.propose(0, targets, values, signatures, calldatas, "");
+        approveAndLock(STAKEHOLDER_MAJOR);
+        pushMockProposal();
 
-        // Factor for voting delay
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
         governor.castVote(2, 1, "");
 
-        // Let proposal finalise
         vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
 
         governor.queue(2);
         vm.stopPrank();
         /* -------------------------------- */
 
-        // Let proposal finalise
         vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + 1 hours);
 
         /* ------TERNARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_TERNARY);
-        governorToken.approve(address(governor), STAKEHOLDER_MINOR);
-        governor.lock(STAKEHOLDER_MINOR);
+        approveAndLock(STAKEHOLDER_MINOR);
         governor.veto(2);
         governor.castVetoVote(2, 1, "");
         vm.stopPrank();
@@ -355,8 +271,7 @@ contract GovernorBaseTest is Test {
 
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_SECONDARY);
-        governorToken.approve(address(governor), STAKEHOLDER_MAJOR);
-        governor.lock(STAKEHOLDER_MAJOR);
+        approveAndLock(STAKEHOLDER_MAJOR);
         governor.castVetoVote(2, 1, "");
         vm.stopPrank();
         /* -------------------------------- */
@@ -373,23 +288,11 @@ contract GovernorBaseTest is Test {
     }
 
     function testCancelledProposal() public {
-        address[] memory targets = new address[](1);
-        string[] memory signatures = new string[](1);
-        bytes[] memory calldatas = new bytes[](1);
-        uint[] memory values = new uint[](1);
-
-        values[0] = 0;
-        targets[0] = address(governor);
-        signatures[0] = "_activateDelegation()";
-        calldatas[0] = "";
-
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
-        governorToken.approve(address(governor), STAKEHOLDER_MAJOR);
-        governor.lock(STAKEHOLDER_MAJOR);
-        governor.propose(0, targets, values, signatures, calldatas, "");
+        approveAndLock(STAKEHOLDER_MAJOR);
+        pushMockProposal();
 
-        // Factor for voting delay
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
         governor.cancel(2);
@@ -407,28 +310,15 @@ contract GovernorBaseTest is Test {
         /* ------KEYHOLDER-STAKEHOLDER------- */
         vm.startPrank(voter);
         governorToken.mint(voter, STAKEHOLDER_MAJOR);
-        governorToken.approve(address(governor), STAKEHOLDER_MAJOR);
-        governor.lock(STAKEHOLDER_MAJOR);
+        approveAndLock(STAKEHOLDER_MAJOR);
         vm.stopPrank();
         /* -------------------------------- */
 
-        address[] memory targets = new address[](1);
-        string[] memory signatures = new string[](1);
-        bytes[] memory calldatas = new bytes[](1);
-        uint[] memory values = new uint[](1);
-
-        values[0] = 0;
-        targets[0] = address(governor);
-        signatures[0] = "_activateDelegation()";
-        calldatas[0] = "";
-
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
-        governorToken.approve(address(governor), STAKEHOLDER_MAJOR);
-        governor.lock(STAKEHOLDER_MAJOR);
-        governor.propose(0, targets, values, signatures, calldatas, "");
+        approveAndLock(STAKEHOLDER_MAJOR);
+        pushMockProposal();
 
-        // Factor for voting delay
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
         governor.castVote(2, 1, "");
@@ -454,40 +344,25 @@ contract GovernorBaseTest is Test {
         /* ------KEYHOLDER-STAKEHOLDER------- */
         vm.startPrank(voter);
         governorToken.mint(voter, STAKEHOLDER_MAJOR);
-        governorToken.approve(address(governor), STAKEHOLDER_MAJOR);
-        governor.lock(STAKEHOLDER_MAJOR);
+        approveAndLock(STAKEHOLDER_MAJOR);
         vm.stopPrank();
         /* -------------------------------- */
 
-        address[] memory targets = new address[](1);
-        string[] memory signatures = new string[](1);
-        bytes[] memory calldatas = new bytes[](1);
-        uint[] memory values = new uint[](1);
-
-        values[0] = 0;
-        targets[0] = address(governor);
-        signatures[0] = "_activateDelegation()";
-        calldatas[0] = "";
-
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
-        governorToken.approve(address(governor), STAKEHOLDER_MAJOR);
-        governor.lock(STAKEHOLDER_MAJOR);
-        governor.propose(0, targets, values, signatures, calldatas, "");
+        approveAndLock(STAKEHOLDER_MAJOR);
+        pushMockProposal();
 
-        // Factor for voting delay
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
         governor.castVote(2, 1, "");
 
-        // Let proposal finalise
         vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
 
         governor.queue(2);
         vm.stopPrank();
         /* -------------------------------- */
 
-        // Let proposal finalise
         vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + 1 hours);
 
         governor.veto(2);
@@ -519,21 +394,10 @@ contract GovernorBaseTest is Test {
         vm.stopPrank();
         /* -------------------------------- */
 
-        address[] memory targets = new address[](1);
-        string[] memory signatures = new string[](1);
-        bytes[] memory calldatas = new bytes[](1);
-        uint[] memory values = new uint[](1);
-
-        values[0] = 0;
-        targets[0] = address(governor);
-        signatures[0] = "_activateDelegation()";
-        calldatas[0] = ""; 
-
         /* ------TERNARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_TERNARY);
-        governorToken.approve(address(governor), STAKEHOLDER_MINOR);
-        governor.lock(STAKEHOLDER_MINOR);
-        governor.propose(0, targets, values, signatures, calldatas, "");
+        approveAndLock(STAKEHOLDER_MINOR);
+        pushMockProposal();
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
@@ -558,41 +422,26 @@ contract GovernorBaseTest is Test {
         vm.stopPrank();
         /* -------------------------------- */
 
-        address[] memory targets = new address[](1);
-        string[] memory signatures = new string[](1);
-        bytes[] memory calldatas = new bytes[](1);
-        uint[] memory values = new uint[](1);
-
-        values[0] = 0;
-        targets[0] = address(governor);
-        signatures[0] = "_activateDelegation()";
-        calldatas[0] = "";
-
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
-        governorToken.approve(address(governor), STAKEHOLDER_MAJOR);
-        governor.lock(STAKEHOLDER_MAJOR);
-        governor.propose(0, targets, values, signatures, calldatas, "");
+        approveAndLock(STAKEHOLDER_MAJOR); 
+        pushMockProposal();
 
-        // Factor for voting delay
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
         governor.castVote(2, 1, "");
 
-        // Let proposal finalise
         vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
 
         governor.queue(2);
         vm.stopPrank();
         /* -------------------------------- */
 
-        // Let proposal finalise
         vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + 1 hours);
 
         /* ------TERNARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_TERNARY);
-        governorToken.approve(address(governor), STAKEHOLDER_MINOR);
-        governor.lock(STAKEHOLDER_MINOR);
+        approveAndLock(STAKEHOLDER_MINOR);
         governor.veto(2);
         governor.castVetoVote(2, 1, "");
         vm.stopPrank();
@@ -606,6 +455,44 @@ contract GovernorBaseTest is Test {
         vm.stopPrank();
         /* -------------------------------- */
 
+        /* ------PRIMARY-STAKEHOLDER------- */
+        vm.startPrank(STAKEHOLDER_PRIMARY);
+        approveAndLock(STAKEHOLDER_MAJOR);
+        pushMockProposal();
+
+        vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
+
+        governor.castVote(2, 1, "");
+
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
+
+        governor.queue(2);
+
+        vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + 1 hours);
+
+        governor.veto(2);
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        /* ------TERNARY-STAKEHOLDER------- */
+        vm.startPrank(STAKEHOLDER_TERNARY);
+        approveAndLock(STAKEHOLDER_MINOR);
+        governor.castVetoVote(2, 1, "");
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        governor.resolve(2);
+
+        GovernorStorageV1.ProposalState endState = governor.state(2);
+        require(endState == GovernorStorageV1.ProposalState.Canceled);
+    }
+
+    function approveAndLock(uint amount) internal {
+        governorToken.approve(address(governor), amount);
+        governor.lock(amount);
+    }
+
+    function pushMockProposal() internal {
         address[] memory targets = new address[](1);
         string[] memory signatures = new string[](1);
         bytes[] memory calldatas = new bytes[](1);
@@ -616,41 +503,7 @@ contract GovernorBaseTest is Test {
         signatures[0] = "_activateDelegation()";
         calldatas[0] = "";
 
-        /* ------PRIMARY-STAKEHOLDER------- */
-        vm.startPrank(STAKEHOLDER_PRIMARY);
-        governorToken.approve(address(governor), STAKEHOLDER_MAJOR);
-        governor.lock(STAKEHOLDER_MAJOR);
         governor.propose(0, targets, values, signatures, calldatas, "");
-
-        // Factor for voting delay
-        vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
-
-        governor.castVote(2, 1, "");
-
-        // Let proposal finalise
-        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
-
-        governor.queue(2);
-
-        // Let proposal finalise
-        vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + 1 hours);
-
-        governor.veto(2);
-        vm.stopPrank();
-        /* -------------------------------- */
-
-        /* ------TERNARY-STAKEHOLDER------- */
-        vm.startPrank(STAKEHOLDER_TERNARY);
-        governorToken.approve(address(governor), STAKEHOLDER_MINOR);
-        governor.lock(STAKEHOLDER_MINOR);
-        governor.castVetoVote(2, 1, "");
-        vm.stopPrank();
-        /* -------------------------------- */
-
-        governor.resolve(2);
-
-        GovernorStorageV1.ProposalState endState = governor.state(2);
-        require(endState == GovernorStorageV1.ProposalState.Canceled);
     }
 
 }
