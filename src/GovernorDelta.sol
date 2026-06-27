@@ -30,6 +30,12 @@ contract GovernorDelta is GovernorStorageV3 {
     /// @notice The maximum number of actions that can be included in a proposal
     uint public constant MAX_PROPOSAL_OPERATIONS = 10; 
 
+    /// @notice Default veto quota, assigned on initialisation
+    uint public constant DEFAULT_VETO_QUOTA = 10000e18;
+
+    /// @notice Default veto quorum, assigned on initialisation 
+    uint public constant DEFAULT_VETO_QUORUM = 30000e18;
+
     /// @notice Proposal tier 0 (low) minimum canonical weight
     uint public constant DEFAULT_TIER_0_QUORUM = 10000e18;
 
@@ -73,6 +79,8 @@ contract GovernorDelta is GovernorStorageV3 {
         proposalConfig[1] = Graduated({ quorum: DEFAULT_TIER_1_QUORUM, duration: votingPeriod_, quota: proposalQuota_ });
         proposalConfig[2] = Graduated({ quorum: DEFAULT_TIER_2_QUORUM, duration: votingPeriod_, quota: proposalQuota_ });
         proposalConfig[3] = Graduated({ quorum: DEFAULT_TIER_3_QUORUM, duration: votingPeriod_, quota: proposalQuota_ });
+        vetoQuorum = DEFAULT_VETO_QUORUM; 
+        vetoQuota = DEFAULT_VETO_QUOTA;
 
         votingModule = IVotingStrategy(address(new WeightedVotingStrategy(address(this))));
     }
