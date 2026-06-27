@@ -211,10 +211,10 @@ contract GovernorDelta is GovernorStorageV3 {
 
         if (s == ProposalState.Canceled || s == ProposalState.Defeated || s == ProposalState.Expired || s == ProposalState.Executed) { 
           return ProposalStatus.Resolved;
+        } else if (p.contested && block.timestamp < p.eta + vetoPeriod) {
+          return ProposalStatus.Contested;
         } else if (p.veto.primary.forVotes > p.veto.primary.againstVotes && p.veto.primary.totalWeight >= vetoQuorum) {
           return ProposalStatus.Dropped;
-        } else if (p.contested) {
-          return ProposalStatus.Contested;
         } else if (p.results.primary.totalWeight >= quorumVotes) {
           return ProposalStatus.Qualified;
         } else {
@@ -358,9 +358,10 @@ contract GovernorDelta is GovernorStorageV3 {
       * @param proposalId The id of the proposal to execute
     **/
     function execute(uint proposalId) public payable {
+        require(status(proposalId) != ProposalStatus.Dropped, "GovernorDelta:execute: cannot execute contested proposal");
         require(state(proposalId) == ProposalState.Queued, "GovernorDelta::execute: proposal can only be executed if it is queued");
-        require(block.timestamp >= proposal.eta + vetoPeriod, "GovernorDelta::execute: veto period has not elapsed");
         ProposalV2 storage proposal = proposals[proposalId];
+        require(block.timestamp > proposal.eta + vetoPeriod, "GovernorDelta::resolve: veto period has not elapsed");
         proposal.executed = true;
 
         for (uint i = 0; i < proposal.targets.length; i++) {
@@ -393,6 +394,7 @@ contract GovernorDelta is GovernorStorageV3 {
     function resolve(uint proposalId) external payable {
         require(state(proposalId) == ProposalState.Queued, "GovernorDelta::resolve: proposal can only be resolved if it is queued");
         ProposalV2 storage proposal = proposals[proposalId];
+        require(block.timestamp > proposal.eta + vetoPeriod, "GovernorDelta::resolve: veto period has not elapsed");
  
        if(status(proposalId) == ProposalStatus.Dropped) {
           _dropProposal(proposalId, proposal);
