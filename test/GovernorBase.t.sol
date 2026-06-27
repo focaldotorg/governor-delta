@@ -47,9 +47,6 @@ contract GovernorBaseTest is Test {
         governor = new GovernorAdmin();
         timelock = new RelaxedTimelock(msg.sender, DEFAULT_TIMELOCK_DELAY);
 
-        vm.deal(STAKEHOLDER_PRIMARY, 1 ether);
-        vm.deal(STAKEHOLDER_SECONDARY, 1 ether);
-        vm.deal(STAKEHOLDER_TERNARY, 1 ether);
         treasuryToken.mint(address(timelock), TREASURY_RESERVE);
         governorToken.mint(STAKEHOLDER_PRIMARY, STAKEHOLDER_MAJOR);
         governorToken.mint(STAKEHOLDER_SECONDARY, STAKEHOLDER_MAJOR);
@@ -303,15 +300,16 @@ contract GovernorBaseTest is Test {
         require(priorStatus == GovernorStorageV3.ProposalStatus.Contested);
 
         vm.warp(block.timestamp + timelock.GRACE_PERIOD());
+
         vm.expectRevert();
         governor.execute(2);
+        vm.stopPrank();
+        /* -------------------------------- */
 
         GovernorStorageV1.ProposalState endState = governor.state(2); 
         GovernorStorageV3.ProposalStatus endStatus = governor.status(2); 
         require(endStatus == GovernorStorageV3.ProposalStatus.Resolved);
         require(endState == GovernorStorageV1.ProposalState.Succeeded);
-        vm.stopPrank();
-        /* -------------------------------- */
     }
 
     function testVetoedProposal() public {
@@ -350,7 +348,6 @@ contract GovernorBaseTest is Test {
         vm.startPrank(STAKEHOLDER_TERNARY);
         governorToken.approve(address(governor), STAKEHOLDER_MINOR);
         governor.lock(STAKEHOLDER_MINOR);
-
         governor.veto(2);
         governor.castVetoVote(2, 1, "");
         vm.stopPrank();
@@ -396,27 +393,264 @@ contract GovernorBaseTest is Test {
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
         governor.cancel(2);
-        
+
         GovernorStorageV1.ProposalState endState = governor.state(2);
         GovernorStorageV3.ProposalStatus endStatus = governor.status(2);
         require(endStatus == GovernorStorageV3.ProposalStatus.Resolved);
         require(endState == GovernorStorageV1.ProposalState.Canceled);
     }
 
-    function testVoteBySig() public {}
+    function testCastVoteBySig() public {
+        uint256 voterPk = 0xA11CE;
+        address voter = vm.addr(voterPk);
 
-    function testVetoVoteBySig() public {}
+        /* ------KEYHOLDER-STAKEHOLDER------- */
+        vm.startPrank(voter);
+        governorToken.mint(voter, STAKEHOLDER_MAJOR);
+        governorToken.approve(address(governor), STAKEHOLDER_MAJOR);
+        governor.lock(STAKEHOLDER_MAJOR);
+        vm.stopPrank();
+        /* -------------------------------- */
 
-    function testProxyVote() public {}
+        address[] memory targets = new address[](1);
+        string[] memory signatures = new string[](1);
+        bytes[] memory calldatas = new bytes[](1);
+        uint[] memory values = new uint[](1);
 
-    function testStaleWeightVote() public {}
+        values[0] = 0;
+        targets[0] = address(governor);
+        signatures[0] = "_activateDelegation()";
+        calldatas[0] = "";
 
-    function testDelegationActivation() public {}
+        /* ------PRIMARY-STAKEHOLDER------- */
+        vm.startPrank(STAKEHOLDER_PRIMARY);
+        governorToken.approve(address(governor), STAKEHOLDER_MAJOR);
+        governor.lock(STAKEHOLDER_MAJOR);
+        governor.propose(0, targets, values, signatures, calldatas, "");
 
-    function testProposalConfig() public {}
+        // Factor for voting delay
+        vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
-    function testSetVetoQuota() public {}
+        governor.castVote(2, 1, "");
+        /* -------------------------------- */
 
-    function testSetVetoQuorum() public {}
+        // Attempt invalid signature
+        vm.expectRevert();
+        governor.castVoteBySig(2, 1, 0, bytes32(0), bytes32(0));
+
+        bytes32 domainHash = governor.DOMAIN_TYPEHASH();
+        bytes32 domainSeparator = keccak256(abi.encode(domainHash, keccak256(bytes(governor.name())), block.chainid, address(governor)));
+        bytes32 structHash = keccak256(abi.encode(governor.VOTE_TYPEHASH(), 2, 1));
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(voterPk, digest);
+
+        governor.castVoteBySig(2, 1, v, r, s);
+    }
+
+    function testVetoVoteBySig() public {
+        uint256 voterPk = 0xF11AF;
+        address voter = vm.addr(voterPk);
+
+        /* ------KEYHOLDER-STAKEHOLDER------- */
+        vm.startPrank(voter);
+        governorToken.mint(voter, STAKEHOLDER_MAJOR);
+        governorToken.approve(address(governor), STAKEHOLDER_MAJOR);
+        governor.lock(STAKEHOLDER_MAJOR);
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        address[] memory targets = new address[](1);
+        string[] memory signatures = new string[](1);
+        bytes[] memory calldatas = new bytes[](1);
+        uint[] memory values = new uint[](1);
+
+        values[0] = 0;
+        targets[0] = address(governor);
+        signatures[0] = "_activateDelegation()";
+        calldatas[0] = "";
+
+        /* ------PRIMARY-STAKEHOLDER------- */
+        vm.startPrank(STAKEHOLDER_PRIMARY);
+        governorToken.approve(address(governor), STAKEHOLDER_MAJOR);
+        governor.lock(STAKEHOLDER_MAJOR);
+        governor.propose(0, targets, values, signatures, calldatas, "");
+
+        // Factor for voting delay
+        vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
+
+        governor.castVote(2, 1, "");
+
+        // Let proposal finalise
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
+
+        governor.queue(2);
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        // Let proposal finalise
+        vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + 1 hours);
+
+        governor.veto(2);
+
+        // Attempt invalid signature
+        vm.expectRevert();
+        governor.castVetoVoteBySig(2, 1, 0, bytes32(0), bytes32(0));
+
+        bytes32 domainHash = governor.DOMAIN_TYPEHASH();
+        bytes32 domainSeparator = keccak256(abi.encode(domainHash, keccak256(bytes(governor.name())), block.chainid, address(governor)));
+        bytes32 structHash = keccak256(abi.encode(governor.VETO_TYPEHASH(), 2, 1));
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(voterPk, digest);
+
+        governor.castVetoVoteBySig(2, 1, v, r, s);
+    }
+
+    function testProposalConfig() public {
+        GovernorStorageV3.Graduated[4] memory config;
+
+        config[0] = GovernorStorageV3.Graduated({ quorum: STAKEHOLDER_MINOR, quota: DEFAULT_TIER_0_QUOTA, duration: DEFAULT_TIER_0_DURATION });
+        config[1] = GovernorStorageV3.Graduated({ quorum: DEFAULT_TIER_1_QUORUM, quota: DEFAULT_TIER_1_QUOTA, duration: DEFAULT_TIER_1_DURATION });
+        config[2] = GovernorStorageV3.Graduated({ quorum: DEFAULT_TIER_2_QUORUM, quota: DEFAULT_TIER_2_QUOTA, duration: DEFAULT_TIER_2_DURATION });
+        config[3] = GovernorStorageV3.Graduated({ quorum: DEFAULT_TIER_3_QUORUM, quota: DEFAULT_TIER_3_QUOTA, duration: DEFAULT_TIER_3_DURATION });
+
+        /* --------TIMELOCK-------- */
+        vm.startPrank(address(timelock));
+        governor._setProposalConfig(config);
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        address[] memory targets = new address[](1);
+        string[] memory signatures = new string[](1);
+        bytes[] memory calldatas = new bytes[](1);
+        uint[] memory values = new uint[](1);
+
+        values[0] = 0;
+        targets[0] = address(governor);
+        signatures[0] = "_activateDelegation()";
+        calldatas[0] = ""; 
+
+        /* ------TERNARY-STAKEHOLDER------- */
+        vm.startPrank(STAKEHOLDER_TERNARY);
+        governorToken.approve(address(governor), STAKEHOLDER_MINOR);
+        governor.lock(STAKEHOLDER_MINOR);
+        governor.propose(0, targets, values, signatures, calldatas, "");
+
+        vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
+
+        governor.castVote(2, 1, "");
+
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
+
+        vm.expectRevert();
+        governor.queue(2);
+
+        vm.warp(block.timestamp + (DEFAULT_TIER_0_DURATION - DEFAULT_VOTING_PERIOD));
+
+        governor.queue(2);
+        vm.stopPrank();
+        /* -------------------------------- */
+    }
+
+    function testSetVetoQuota() public {
+        /* --------TIMELOCK-------- */
+        vm.startPrank(address(timelock));
+        governor._setVetoQuota(STAKEHOLDER_MINOR);
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        address[] memory targets = new address[](1);
+        string[] memory signatures = new string[](1);
+        bytes[] memory calldatas = new bytes[](1);
+        uint[] memory values = new uint[](1);
+
+        values[0] = 0;
+        targets[0] = address(governor);
+        signatures[0] = "_activateDelegation()";
+        calldatas[0] = "";
+
+        /* ------PRIMARY-STAKEHOLDER------- */
+        vm.startPrank(STAKEHOLDER_PRIMARY);
+        governorToken.approve(address(governor), STAKEHOLDER_MAJOR);
+        governor.lock(STAKEHOLDER_MAJOR);
+        governor.propose(0, targets, values, signatures, calldatas, "");
+
+        // Factor for voting delay
+        vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
+
+        governor.castVote(2, 1, "");
+
+        // Let proposal finalise
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
+
+        governor.queue(2);
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        // Let proposal finalise
+        vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + 1 hours);
+
+        /* ------TERNARY-STAKEHOLDER------- */
+        vm.startPrank(STAKEHOLDER_TERNARY);
+        governorToken.approve(address(governor), STAKEHOLDER_MINOR);
+        governor.lock(STAKEHOLDER_MINOR);
+        governor.veto(2);
+        governor.castVetoVote(2, 1, "");
+        vm.stopPrank();
+        /* -------------------------------- */
+    }
+
+    function testSetVetoQuorum() public {
+        /* --------TIMELOCK-------- */
+        vm.startPrank(address(timelock));
+        governor._setVetoQuorum(STAKEHOLDER_MINOR);
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        address[] memory targets = new address[](1);
+        string[] memory signatures = new string[](1);
+        bytes[] memory calldatas = new bytes[](1);
+        uint[] memory values = new uint[](1);
+
+        values[0] = 0;
+        targets[0] = address(governor);
+        signatures[0] = "_activateDelegation()";
+        calldatas[0] = "";
+
+        /* ------PRIMARY-STAKEHOLDER------- */
+        vm.startPrank(STAKEHOLDER_PRIMARY);
+        governorToken.approve(address(governor), STAKEHOLDER_MAJOR);
+        governor.lock(STAKEHOLDER_MAJOR);
+        governor.propose(0, targets, values, signatures, calldatas, "");
+
+        // Factor for voting delay
+        vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
+
+        governor.castVote(2, 1, "");
+
+        // Let proposal finalise
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
+
+        governor.queue(2);
+
+        // Let proposal finalise
+        vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + 1 hours);
+
+        governor.veto(2);
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        /* ------TERNARY-STAKEHOLDER------- */
+        vm.startPrank(STAKEHOLDER_TERNARY);
+        governorToken.approve(address(governor), STAKEHOLDER_MINOR);
+        governor.lock(STAKEHOLDER_MINOR);
+        governor.castVetoVote(2, 1, "");
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        governor.resolve(2);
+
+        GovernorStorageV1.ProposalState endState = governor.state(2);
+        require(endState == GovernorStorageV1.ProposalState.Canceled);
+    }
 
 }
