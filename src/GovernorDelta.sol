@@ -211,7 +211,7 @@ contract GovernorDelta is GovernorStorageV3 {
 
         if (s == ProposalState.Canceled || s == ProposalState.Defeated || s == ProposalState.Expired || s == ProposalState.Executed) { 
           return ProposalStatus.Resolved;
-        } else if (p.contested && block.timestamp < p.eta + vetoPeriod) {
+        } else if (p.contested && block.timestamp < p.eta) {
           return ProposalStatus.Contested;
         } else if (p.veto.primary.forVotes > p.veto.primary.againstVotes && p.veto.primary.totalWeight >= vetoQuorum) {
           return ProposalStatus.Dropped;
@@ -300,7 +300,7 @@ contract GovernorDelta is GovernorStorageV3 {
       * @return Proposal id of new proposal
       */
     function propose(uint8 tier, address[] memory targets, uint[] memory values, string[] memory signatures, bytes[] memory calldatas, string memory description) public returns (uint) {
-        require(tier < 5, "GovernorDelta::propose: Invalid proposal tier");
+        require(tier < 4, "GovernorDelta::propose: Invalid proposal tier");
         Graduated storage framework = proposalConfig[tier];
         (uint balance,) = stake(msg.sender); 
         // Reject proposals before initiating as Governor
@@ -344,7 +344,7 @@ contract GovernorDelta is GovernorStorageV3 {
     function queue(uint proposalId) external {
         require(state(proposalId) == ProposalState.Succeeded, "GovernorDelta::queue: proposal can only be queued if it is succeeded");
         ProposalV2 storage proposal = proposals[proposalId];
-        proposal.eta = block.timestamp + timelock.delay();
+        proposal.eta = block.timestamp + votingPeriod;
 
         for (uint i = 0; i < proposal.targets.length; i++) {
             _queueOrRevert(proposal.targets[i], proposal.values[i], proposal.signatures[i], proposal.calldatas[i], proposal.eta);
@@ -361,7 +361,7 @@ contract GovernorDelta is GovernorStorageV3 {
         require(status(proposalId) != ProposalStatus.Dropped, "GovernorDelta:execute: cannot execute contested proposal");
         require(state(proposalId) == ProposalState.Queued, "GovernorDelta::execute: proposal can only be executed if it is queued");
         ProposalV2 storage proposal = proposals[proposalId];
-        require(block.timestamp > proposal.eta + vetoPeriod, "GovernorDelta::resolve: veto period has not elapsed");
+        require(block.timestamp > proposal.eta, "GovernorDelta::resolve: veto period has not elapsed");
         proposal.executed = true;
 
         for (uint i = 0; i < proposal.targets.length; i++) {
@@ -380,7 +380,7 @@ contract GovernorDelta is GovernorStorageV3 {
         ProposalV2 storage proposal = proposals[proposalId];
         require(!proposal.contested, "GovernorDelta::veto: proposal already contested");
         require(balance >= vetoQuota, "GovernorDelta::veto: insufficient balance for quota");
-        require(block.timestamp < proposal.eta + vetoPeriod, "GovernorDelta::execute: veto period has elapsed");
+        require(block.timestamp < proposal.eta, "GovernorDelta::execute: veto period has elapsed");
         require(state(proposalId) == ProposalState.Queued, "GovernorDelta::veto: proposal can only be executed if it is queued");
         proposal.contested = true;
 
@@ -394,7 +394,7 @@ contract GovernorDelta is GovernorStorageV3 {
     function resolve(uint proposalId) external payable {
         require(state(proposalId) == ProposalState.Queued, "GovernorDelta::resolve: proposal can only be resolved if it is queued");
         ProposalV2 storage proposal = proposals[proposalId];
-        require(block.timestamp > proposal.eta + vetoPeriod, "GovernorDelta::resolve: veto period has not elapsed");
+        require(block.timestamp > proposal.eta, "GovernorDelta::resolve: veto period has not elapsed");
  
        if(status(proposalId) == ProposalStatus.Dropped) {
           _dropProposal(proposalId, proposal);
