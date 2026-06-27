@@ -24,11 +24,17 @@ contract GovernorDelta is GovernorStorageV3 {
     /// @notice The max setable voting delay
     uint public constant MAX_VOTING_DELAY = 1 weeks; 
 
+    /// @notice Minimum veto period threshold
+    uint public constant MIN_VETO_PERIOD = 2 days;
+
+    /// @notice Maximum veto period threshold (must be in range of timelocks grace period)
+    uint public constant MAX_VETO_PERIOD = 14 days;
+
+    /// @notice Default veto period, assigned on initialisation
+    uint public constant DEFAULT_VETO_PERIOD = 3 days;
+
     /// @notice The minimum number of votes of a proposal required for a proposal to be valid
     uint public constant MIN_QUORUM_VOTES = 5000e18; 
-
-    /// @notice The maximum number of actions that can be included in a proposal
-    uint public constant MAX_PROPOSAL_OPERATIONS = 10; 
 
     /// @notice Default veto quota, assigned on initialisation
     uint public constant DEFAULT_VETO_QUOTA = 10000e18;
@@ -47,6 +53,9 @@ contract GovernorDelta is GovernorStorageV3 {
 
     /// @notice Proposal tier 3 (critical) minimum canonical weight
     uint public constant DEFAULT_TIER_3_QUORUM = 51000e18;
+
+    /// @notice The maximum number of actions that can be included in a proposal
+    uint public constant MAX_PROPOSAL_OPERATIONS = 10; 
 
     /// @notice The EIP-712 typehash for the vote struct used by the contract
     bytes32 public constant VOTE_TYPEHASH = keccak256("Vote(uint256 proposalId,uint8 support)");
@@ -81,6 +90,7 @@ contract GovernorDelta is GovernorStorageV3 {
         proposalConfig[3] = Graduated({ quorum: DEFAULT_TIER_3_QUORUM, duration: votingPeriod_, quota: proposalQuota_ });
         vetoQuorum = DEFAULT_VETO_QUORUM; 
         vetoQuota = DEFAULT_VETO_QUOTA;
+        vetoPeriod = DEFAULT_VETO_PERIOD;
 
         votingModule = IVotingStrategy(address(new WeightedVotingStrategy(address(this))));
     }
@@ -332,10 +342,10 @@ contract GovernorDelta is GovernorStorageV3 {
       * @param proposalId The id of the proposal to queue
     **/
     function queue(uint proposalId) external {
-        require(state(proposalId) == ProposalState.Succeeded, "GovernorBravo::queue: proposal can only be queued if it is succeeded");
+        require(state(proposalId) == ProposalState.Succeeded, "GovernorDelta::queue: proposal can only be queued if it is succeeded");
         ProposalV2 storage proposal = proposals[proposalId];
-
         proposal.eta = block.timestamp + timelock.delay();
+
         for (uint i = 0; i < proposal.targets.length; i++) {
             _queueOrRevert(proposal.targets[i], proposal.values[i], proposal.signatures[i], proposal.calldatas[i], proposal.eta);
         }
@@ -348,8 +358,8 @@ contract GovernorDelta is GovernorStorageV3 {
       * @param proposalId The id of the proposal to execute
     **/
     function execute(uint proposalId) public payable {
-        require(state(proposalId) == ProposalState.Queued, "GovernorBravo::execute: proposal can only be executed if it is queued");
-        require(status(proposalId) != ProposalStatus.Contested, "GovernorBravo::execute: proposal can only be executed if it is queued");
+        require(state(proposalId) == ProposalState.Queued, "GovernorDelta::execute: proposal can only be executed if it is queued");
+        require(block.timestamp >= proposal.eta + vetoPeriod, "GovernorDelta::execute: veto period has not elapsed");
         ProposalV2 storage proposal = proposals[proposalId];
         proposal.executed = true;
 
@@ -366,9 +376,11 @@ contract GovernorDelta is GovernorStorageV3 {
     **/
     function veto(uint proposalId) external {
         (uint balance,) = stake(msg.sender);
-        require(balance >= vetoQuota, "GovernorDelta::veto: insufficient balance for quota");
-        require(state(proposalId) == ProposalState.Queued, "GovernorDelta::veto: proposal can only be executed if it is queued");
         ProposalV2 storage proposal = proposals[proposalId];
+        require(!proposal.contested, "GovernorDelta::veto: proposal already contested");
+        require(balance >= vetoQuota, "GovernorDelta::veto: insufficient balance for quota");
+        require(block.timestamp < proposal.eta + vetoPeriod, "GovernorDelta::execute: veto period has elapsed");
+        require(state(proposalId) == ProposalState.Queued, "GovernorDelta::veto: proposal can only be executed if it is queued");
         proposal.contested = true;
 
         emit ProposalVetoed(proposalId);
@@ -692,6 +704,19 @@ contract GovernorDelta is GovernorStorageV3 {
     }
 
     /**
+      * @notice Admin function for setting the veto period
+      * @param newVetoPeriod new proposal veto duration
+    **/
+    function _setVetoPeriod(uint newVetoPeriod) external {
+        require(msg.sender == admin, "GovernorDelta::_setVetoPeriod: admin only");
+        require(newVetoPeriod >= MIN_VETO_PERIOD && newVetoPeriod <= MAX_VETO_PERIOD, "GovernorDelta::_setVetoPeriod: invalid veto period");
+        uint old = vetoPeriod;
+        vetoPeriod = newVetoPeriod;
+
+        emit VetoPeriodSet(old, newVetoPeriod);
+    }
+
+    /**
       * @notice Admin function for setting the veto quota
       * @param newVetoQuota new proposal threshold
     **/
@@ -716,6 +741,11 @@ contract GovernorDelta is GovernorStorageV3 {
         emit VetoQuorumSet(oldVetoQuorum, vetoQuorum);
     }
 
+
+    /**
+      * @notice Admin function for configuring the governing voting module 
+      * @param votingStrategy new voting module strategy implementation address 
+    **/
     function _setVotingModule(address votingStrategy) external {
         require(msg.sender == admin, "GovernorDelta::_setVotingModule: admin only");
         address previousModule = address(votingModule);
