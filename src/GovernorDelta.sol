@@ -25,7 +25,7 @@ contract GovernorDelta is GovernorStorageV3 {
     uint public constant MAX_VOTING_DELAY = 1 weeks; 
 
     /// @notice The minimum number of votes of a proposal required for a proposal to be valid
-    uint public constant MIN_QUORUM_VOTES = 400000e18; 
+    uint public constant MIN_QUORUM_VOTES = 5000e18; 
 
     /// @notice The maximum number of actions that can be included in a proposal
     uint public constant MAX_PROPOSAL_OPERATIONS = 10; 
