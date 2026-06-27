@@ -738,7 +738,7 @@ contract GovernorDelta is GovernorStorageV3 {
         require(msg.sender == admin, "GovernorDelta::_setVetoQuorum: admin only");
         require(newVetoQuorum >= MIN_QUORUM_VOTES, "GovernorDelta::_setVetoQuorum: quorum below minimum");
         uint oldVetoQuorum = vetoQuorum;
-        vetoQuota = newVetoQuorum;
+        vetoQuorum = newVetoQuorum;
 
         emit VetoQuorumSet(oldVetoQuorum, vetoQuorum);
     }
