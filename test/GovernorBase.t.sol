@@ -42,7 +42,7 @@ contract GovernorBaseTest is Test {
     address public constant STAKEHOLDER_SECONDARY = 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045;
     address public constant STAKEHOLDER_TERNARY   = 0x66f820a414680B5bcda5eECA5dea238543F42054;
 
-    function setUp() public {
+    function setUp() public virtual {
         treasuryToken = new TestERC20();
         governorToken = new TestERC20();
         governor = deployGovernor();
@@ -550,7 +550,7 @@ contract GovernorBaseTest is Test {
         governor.propose(0, targets, values, signatures, calldatas, "");
     }
 
-    function deployGovernor() internal override returns (GovernorAdmin) {
+    function deployGovernor() internal virtual returns (GovernorAdmin) {
         return new GovernorAdmin();
     }
 

@@ -1,7 +1,7 @@
 pragma solidity ^0.8.13;
 
 import { GovernorAdmin } from "./mock/GovernorAdmin.sol";
-import { GovernorBaseTest } from "./mock/GovernorBase.t.sol";
+import { GovernorBaseTest } from "./GovernorBase.t.sol";
 
 contract CanonicalGovernorTest is GovernorBaseTest {
 
