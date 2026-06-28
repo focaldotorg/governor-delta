@@ -589,6 +589,7 @@ contract GovernorDelta is GovernorStorageV3 {
       * @param delegateIds The delegation identifiers to attest
     **/
     function batchAttestVotes(uint proposalId, bytes[] memory delegateIds) external {
+        // @TODO Think about conflict between veto mechanism
         require(delegationActive, "GovernorDelta::batchAttestVotes: delegation not active");
         require(votingModule.virtualized(), "GovernorDelta::batchAttestVotes: unsupported virtualized voting strategy");
         require(state(proposalId) == ProposalState.Queued, "GovernorDelta::batchAttestVotes: proposal not in timelock");
@@ -711,6 +712,7 @@ contract GovernorDelta is GovernorStorageV3 {
       * @param newVetoPeriod new proposal veto duration
     **/
     function _setVetoPeriod(uint newVetoPeriod) external {
+        // @TODO factor for timelock race condition 
         require(msg.sender == admin, "GovernorDelta::_setVetoPeriod: admin only");
         require(newVetoPeriod >= MIN_VETO_PERIOD && newVetoPeriod <= MAX_VETO_PERIOD, "GovernorDelta::_setVetoPeriod: invalid veto period");
         uint old = vetoPeriod;

@@ -93,7 +93,7 @@ contract GovernorBaseTest is Test {
         (uint stakeLast, uint deltaTimeLast) = governor.stake(STAKEHOLDER_PRIMARY);
 
         require(balanceLast == 500e18);
-        require(stakeLast == 44500e18);
+        require(stakeLast == 14500e18);
         require(deltaTimeLast == (block.timestamp - beforeTs) * STAKEHOLDER_MAJOR);
     }
 
@@ -174,7 +174,7 @@ contract GovernorBaseTest is Test {
 
         governor.queue(2);
 
-        vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY);
+        vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + DEFAULT_VETO_PERIOD + 1);
 
         governor.execute(2);
         vm.stopPrank();
@@ -195,7 +195,7 @@ contract GovernorBaseTest is Test {
 
         governor.queue(2);
 
-        vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + timelock.GRACE_PERIOD());
+        vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + timelock.GRACE_PERIOD() + 1);
 
         vm.expectRevert();
         governor.execute(2);
@@ -247,7 +247,7 @@ contract GovernorBaseTest is Test {
         vm.stopPrank();
         /* -------------------------------- */
 
-        vm.warp(block.timestamp + DEFAULT_VETO_PERIOD + 1);
+        vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + DEFAULT_VETO_PERIOD + 1);
 
         governor.execute(2);
 
@@ -273,25 +273,27 @@ contract GovernorBaseTest is Test {
         vm.stopPrank();
         /* -------------------------------- */
 
-        vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + 1 hours);
-
-        /* ------TERNARY-STAKEHOLDER------- */
-        vm.startPrank(STAKEHOLDER_TERNARY);
-        approveAndLock(STAKEHOLDER_MINOR);
+        /* ------PRIMARY-STAKEHOLDER------- */
+        vm.startPrank(STAKEHOLDER_SECONDARY);
+        approveAndLock(STAKEHOLDER_MAJOR);
         governor.veto(2);
         governor.castVetoVote(2, 1, "");
         vm.stopPrank();
         /* -------------------------------- */
 
-        /* ------PRIMARY-STAKEHOLDER------- */
-        vm.startPrank(STAKEHOLDER_SECONDARY);
-        approveAndLock(STAKEHOLDER_MAJOR);
-        governor.castVetoVote(2, 1, "");
-        vm.stopPrank();
-        /* -------------------------------- */
-        
         GovernorStorageV3.ProposalStatus priorStatus = governor.status(2); 
         require(priorStatus == GovernorStorageV3.ProposalStatus.Contested);
+
+        /* ------PRIMARY-STAKEHOLDER------- */
+        vm.startPrank(STAKEHOLDER_PRIMARY);
+        governor.castVetoVote(2, 1, "");
+        vm.stopPrank();
+        /* -------------------------------- */ 
+
+        vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + DEFAULT_VETO_PERIOD + 1);
+
+        GovernorStorageV3.ProposalStatus postStatus = governor.status(2); 
+        require(postStatus == GovernorStorageV3.ProposalStatus.Dropped);
 
         governor.resolve(2);
 
@@ -371,15 +373,12 @@ contract GovernorBaseTest is Test {
 
         governor.castVote(2, 1, "");
 
-        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD + 1);
 
         governor.queue(2);
+        governor.veto(2);
         vm.stopPrank();
         /* -------------------------------- */
-
-        vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + 1 hours);
-
-        governor.veto(2);
 
         // Attempt invalid signature
         vm.expectRevert();
@@ -451,8 +450,6 @@ contract GovernorBaseTest is Test {
         vm.stopPrank();
         /* -------------------------------- */
 
-        vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + 1 hours);
-
         /* ------TERNARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_TERNARY);
         approveAndLock(STAKEHOLDER_MINOR);
@@ -481,9 +478,6 @@ contract GovernorBaseTest is Test {
         vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
 
         governor.queue(2);
-
-        vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + 1 hours);
-
         governor.veto(2);
         vm.stopPrank();
         /* -------------------------------- */
@@ -495,10 +489,46 @@ contract GovernorBaseTest is Test {
         vm.stopPrank();
         /* -------------------------------- */
 
+        vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + DEFAULT_VETO_PERIOD + 1);
+
         governor.resolve(2);
 
         GovernorStorageV1.ProposalState endState = governor.state(2);
         require(endState == GovernorStorageV1.ProposalState.Canceled);
+    }
+
+    function testSetVetoPeriod() public {
+        /* --------TIMELOCK-------- */
+        vm.startPrank(address(timelock));
+        governor._setVetoPeriod(DEFAULT_VETO_PERIOD + 3 days);
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        /* ------PRIMARY-STAKEHOLDER------- */
+        vm.startPrank(STAKEHOLDER_PRIMARY);
+        approveAndLock(STAKEHOLDER_MAJOR);
+        pushMockProposal();
+
+        vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
+
+        governor.castVote(2, 1, "");
+
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
+
+        governor.queue(2);
+        governor.veto(2);
+        governor.castVetoVote(2, 1, "");
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + DEFAULT_VETO_PERIOD + 1);
+
+        vm.expectRevert();
+        governor.resolve(2);
+
+        vm.warp(block.timestamp + 3 days);
+
+        governor.resolve(2);
     }
 
     function approveAndLock(uint amount) internal {
