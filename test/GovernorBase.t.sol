@@ -45,7 +45,7 @@ contract GovernorBaseTest is Test {
     function setUp() public {
         treasuryToken = new TestERC20();
         governorToken = new TestERC20();
-        governor = new GovernorAdmin();
+        governor = deployGovernor();
         timelock = new RelaxedTimelock(msg.sender, DEFAULT_TIMELOCK_DELAY);
         // Distribute assets
         treasuryToken.mint(address(timelock), TREASURY_RESERVE);
@@ -548,6 +548,10 @@ contract GovernorBaseTest is Test {
         calldatas[0] = "";
 
         governor.propose(0, targets, values, signatures, calldatas, "");
+    }
+
+    function deployGovernor() internal override returns (GovernorAdmin) {
+        return new GovernorAdmin();
     }
 
 }
