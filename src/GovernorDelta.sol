@@ -344,11 +344,11 @@ contract GovernorDelta is GovernorStorageV3 {
     function queue(uint proposalId) external {
         require(state(proposalId) == ProposalState.Succeeded, "GovernorDelta::queue: proposal can only be queued if it is succeeded");
         ProposalV2 storage proposal = proposals[proposalId];
-        proposal.window = block.timestamp;
+        proposal.window = block.timestamp + timelock.delay();
         proposal.eta = proposal.window + vetoPeriod;
 
         for (uint i = 0; i < proposal.targets.length; i++) {
-            _queueOrRevert(proposal.targets[i], proposal.values[i], proposal.signatures[i], proposal.calldatas[i], proposal.eta);
+            _queueOrRevert(proposal.targets[i], proposal.values[i], proposal.signatures[i], proposal.calldatas[i], proposal.window);
         }
         
         emit ProposalQueued(proposalId, proposal.eta);
@@ -366,7 +366,7 @@ contract GovernorDelta is GovernorStorageV3 {
         proposal.executed = true;
 
         for (uint i = 0; i < proposal.targets.length; i++) {
-            timelock.executeTransaction{value: proposal.values[i]}(proposal.targets[i], proposal.values[i], proposal.signatures[i], proposal.calldatas[i], proposal.eta);
+            timelock.executeTransaction{value: proposal.values[i]}(proposal.targets[i], proposal.values[i], proposal.signatures[i], proposal.calldatas[i], proposal.window);
         }
 
         emit ProposalExecuted(proposalId);
@@ -829,7 +829,7 @@ contract GovernorDelta is GovernorStorageV3 {
         proposal.canceled = true;
 
         for (uint i = 0; i < proposal.targets.length; i++) {
-            timelock.cancelTransaction(proposal.targets[i], proposal.values[i], proposal.signatures[i], proposal.calldatas[i], proposal.eta);
+            timelock.cancelTransaction(proposal.targets[i], proposal.values[i], proposal.signatures[i], proposal.calldatas[i], proposal.window);
         }
     }
 
