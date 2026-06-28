@@ -233,6 +233,9 @@ contract GovernorStorageV3 is IGovernor, GovernorStorageV2 {
         /// @notice The timestamp that the proposal will be available for execution, set once the vote succeeds
         uint eta;
 
+        /// @notice The timestamp that the proposal is queued  
+        uint window;
+
         /// @notice the ordered list of target addresses for calls to be made
         address[] targets;
 

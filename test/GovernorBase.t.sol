@@ -16,13 +16,14 @@ contract GovernorBaseTest is Test {
     TestERC20 treasuryToken;
     TestERC20 governorToken;
   
-    uint public constant STAKEHOLDER_MAJOR = 45000 ether;
+    uint public constant STAKEHOLDER_MAJOR = 15000 ether;
     uint public constant STAKEHOLDER_MINOR = 5000 ether;
     uint public constant TREASURY_RESERVE = 20000 ether;
     uint public constant DEFAULT_PROPOSAL_QUOTA = 1000 ether;
     uint public constant DEFAULT_VOTING_PERIOD = 3 days;
     uint public constant DEFAULT_VOTING_DELAY = 2 days;
     uint public constant DEFAULT_TIMELOCK_DELAY = 1 days;
+    uint public constant DEFAULT_VETO_PERIOD = 3 days;
 
     uint public constant DEFAULT_TIER_0_QUORUM = 10000e18;
     uint public constant DEFAULT_TIER_0_QUOTA = 500e18;
@@ -108,13 +109,14 @@ contract GovernorBaseTest is Test {
 
         governor.castVote(2, 1, "");
 
+        GovernorStorageV3.ProposalStatus endStatus = governor.status(2);
+        require(endStatus == GovernorStorageV3.ProposalStatus.Unqualified);
+
         // Let proposal finalise
         vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
 
         GovernorStorageV1.ProposalState endState = governor.state(2); 
-        GovernorStorageV3.ProposalStatus endStatus = governor.status(2);
         require(endState == GovernorStorageV1.ProposalState.Defeated);
-        require(endStatus == GovernorStorageV3.ProposalStatus.Unqualified);
         vm.expectRevert();
         governor.queue(2);
         vm.stopPrank();
@@ -130,6 +132,7 @@ contract GovernorBaseTest is Test {
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
         governor.castVote(2, 1, "");
+        vm.stopPrank();
         /* -------------------------------- */
 
         /* ------SECONDARY-STAKEHOLDER------- */
@@ -146,7 +149,7 @@ contract GovernorBaseTest is Test {
         vm.stopPrank();
         /* -------------------------------- */
 
-        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD + 1);
 
         vm.expectRevert();
         governor.queue(2);
@@ -154,8 +157,7 @@ contract GovernorBaseTest is Test {
         GovernorStorageV1.ProposalState endState = governor.state(2); 
         GovernorStorageV3.ProposalStatus endStatus = governor.status(2);
         require(endState == GovernorStorageV1.ProposalState.Defeated);
-        require(endStatus == GovernorStorageV3.ProposalStatus.Qualified);
-        vm.stopPrank();
+        require(endStatus == GovernorStorageV3.ProposalStatus.Resolved);
     }
 
     function testValidProposal() public {
@@ -219,28 +221,40 @@ contract GovernorBaseTest is Test {
         vm.stopPrank();
         /* -------------------------------- */
 
-        vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + 1 hours);
+        vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
-        /* ------TERNARY-STAKEHOLDER------- */
-        vm.startPrank(STAKEHOLDER_TERNARY);
-        approveAndLock(STAKEHOLDER_MINOR);
+        /* ------SECONDARY-STAKEHOLDER------- */
+        vm.startPrank(STAKEHOLDER_SECONDARY);
+        approveAndLock(STAKEHOLDER_MAJOR);
         governor.veto(2);
         governor.castVetoVote(2, 0, "");
+        vm.stopPrank();
+        /* -------------------------------- */
 
         GovernorStorageV3.ProposalStatus priorStatus = governor.status(2); 
         require(priorStatus == GovernorStorageV3.ProposalStatus.Contested);
 
-        vm.warp(block.timestamp + timelock.GRACE_PERIOD());
-
-        vm.expectRevert();
-        governor.execute(2);
+        /* ------TERNARY-STAKEHOLDER------- */
+        vm.startPrank(STAKEHOLDER_TERNARY);
+        approveAndLock(STAKEHOLDER_MINOR);
+        governor.castVetoVote(2, 1, "");
         vm.stopPrank();
         /* -------------------------------- */
+
+        /* ------PRIMARY-STAKEHOLDER------- */
+        vm.startPrank(STAKEHOLDER_PRIMARY);
+        governor.castVetoVote(2, 0, "");
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        vm.warp(block.timestamp + DEFAULT_VETO_PERIOD + 1);
+
+        governor.execute(2);
 
         GovernorStorageV1.ProposalState endState = governor.state(2); 
         GovernorStorageV3.ProposalStatus endStatus = governor.status(2); 
         require(endStatus == GovernorStorageV3.ProposalStatus.Resolved);
-        require(endState == GovernorStorageV1.ProposalState.Succeeded);
+        require(endState == GovernorStorageV1.ProposalState.Executed);
     }
 
     function testVetoedProposal() public {

@@ -244,7 +244,7 @@ contract GovernorDelta is GovernorStorageV3 {
             return ProposalState.Succeeded;
         } else if (p.executed) {
             return ProposalState.Executed;
-        } else if (block.timestamp >= p.eta + timelock.GRACE_PERIOD()) {
+        } else if (block.timestamp > p.window + timelock.GRACE_PERIOD()) {
             return ProposalState.Expired;
         } else {
             return ProposalState.Queued;
@@ -344,7 +344,8 @@ contract GovernorDelta is GovernorStorageV3 {
     function queue(uint proposalId) external {
         require(state(proposalId) == ProposalState.Succeeded, "GovernorDelta::queue: proposal can only be queued if it is succeeded");
         ProposalV2 storage proposal = proposals[proposalId];
-        proposal.eta = block.timestamp + vetoPeriod;
+        proposal.window = block.timestamp;
+        proposal.eta = proposal.window + vetoPeriod;
 
         for (uint i = 0; i < proposal.targets.length; i++) {
             _queueOrRevert(proposal.targets[i], proposal.values[i], proposal.signatures[i], proposal.calldatas[i], proposal.eta);
