@@ -66,6 +66,9 @@ interface IGovernor {
     /// @notice Emitted when veto threshold is set
     event VetoQuotaSet(uint oldVetoQuota, uint newVetoQuota);
 
+    /// @notice Emitted when veto period is set
+    event VetoPeriodSet(uint oldVetoPeriod, uint newVetoPeriod);
+
     /// @notice Emitted when pendingAdmin is changed
     event NewPendingAdmin(address oldPendingAdmin, address newPendingAdmin);
 

@@ -344,7 +344,7 @@ contract GovernorDelta is GovernorStorageV3 {
     function queue(uint proposalId) external {
         require(state(proposalId) == ProposalState.Succeeded, "GovernorDelta::queue: proposal can only be queued if it is succeeded");
         ProposalV2 storage proposal = proposals[proposalId];
-        proposal.eta = block.timestamp + votingPeriod;
+        proposal.eta = block.timestamp + vetoPeriod;
 
         for (uint i = 0; i < proposal.targets.length; i++) {
             _queueOrRevert(proposal.targets[i], proposal.values[i], proposal.signatures[i], proposal.calldatas[i], proposal.eta);
@@ -616,15 +616,15 @@ contract GovernorDelta is GovernorStorageV3 {
       * @param veto Whether the vote is a veto vote
     **/
     function _logVote(address voter, uint proposalId, uint8 support, bool veto) internal returns (uint) {
+        Stake storage stake = stakes[voter];
         ProposalV2 storage proposal = proposals[proposalId];
         Tally storage tally = !veto ? proposal.results : proposal.veto;
-        Ballot storage ballot = tally.primary;
-        Stake storage stake = stakes[voter];
-        uint weight = stake.amount; 
-        uint votes = predictedPower(voter, proposal.endTime);
-        stake.unlockTime = !veto ? proposal.endTime : proposal.eta;
+        Ballot storage ballot = tally.primary; 
+        uint resolveTs = veto ? proposal.eta : proposal.endTime;
+        uint votes = veto ? stake.amount : predictedPower(voter, proposal.endTime);
+        stake.unlockTime = resolveTs;
  
-        return _recordVote(voter, support, ballot, veto ? weight : votes, weight);
+        return _recordVote(voter, support, ballot, votes, stake.amount);
     }
 
     /**

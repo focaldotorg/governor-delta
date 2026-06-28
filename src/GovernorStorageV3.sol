@@ -177,8 +177,12 @@ contract GovernorStorageV3 is IGovernor, GovernorStorageV2 {
     /// @notice The number of votes cast required for a veto proposal to be considered valid
     uint public vetoQuorum; 
 
+    /// @notice The duration of which a proposal can be contested
+    uint public vetoPeriod; 
+
     /// @notice The number of staked canonical tokens locked by stakers
     uint public totalStaked; 
+
 
     /// @notice A record of states for signing / validating signatures
     mapping (address => uint) public nonces;
