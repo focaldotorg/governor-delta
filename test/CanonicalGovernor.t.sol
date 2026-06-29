@@ -5,10 +5,6 @@ import { GovernorBaseTest } from "./GovernorBase.t.sol";
 
 contract CanonicalGovernorTest is GovernorBaseTest {
 
-    address public constant STAKEHOLDER_ALPHA = 0x67aA499679E75EdFbfb7719fB4795a9c389eC38c;
-    address public constant STAKEHOLDER_BETA  = 0x4838B106FCe9647Bdf1E7877BF73cE8B0BAD5f97;
-    address public constant STAKEHOLDER_THETA = 0x3011426bB63e7BE9b6b8AdF572874009569710b8;
-
     address public constant DELEGATOR_PRIMARY     = 0x8A1c5E88Ca465be1D01e4B437CE4E082fD14E25e;
     address public constant DELEGATOR_SECONDARY   = 0xE0D268481983B218e83DEe30da1c9f36B56Ffa0a;
     address public constant DELEGATEE_PRIMARY     = 0x557a4fC606ae646F585BC73aD2a4fc745a8CBcc8;
@@ -16,12 +12,7 @@ contract CanonicalGovernorTest is GovernorBaseTest {
 
     function setUp() public override {
         super.setUp(); 
-
-        governorToken.mint(STAKEHOLDER_ALPHA, STAKEHOLDER_MAJOR);
-        governorToken.mint(STAKEHOLDER_BETA, STAKEHOLDER_MAJOR);
-        governorToken.mint(STAKEHOLDER_THETA, STAKEHOLDER_MAJOR);
-        governorToken.mint(STAKEHOLDER_ALPHA, STAKEHOLDER_MAJOR);
-        governorToken.mint(STAKEHOLDER_BETA, STAKEHOLDER_MAJOR);
+      
         governorToken.mint(DELEGATOR_PRIMARY, STAKEHOLDER_MINOR);
         governorToken.mint(DELEGATOR_SECONDARY, STAKEHOLDER_MINOR);
         governorToken.mint(DELEGATEE_PRIMARY, STAKEHOLDER_MINOR);
@@ -45,9 +36,9 @@ contract CanonicalGovernorTest is GovernorBaseTest {
         vm.startPrank(DELEGATOR_PRIMARY);
         // Cant delegate past the max threshold
         vm.expectRevert();
-        governor.delegate(DELEGATEE_PRIMARY, 366 days);
+        governor.delegate(DELEGATEE_PRIMARY, block.timestamp + 366 days);
         //////////////////////////////////////
-        governor.delegate(DELEGATEE_PRIMARY, 7 days);
+        governor.delegate(DELEGATEE_PRIMARY, block.timestamp + 7 days);
         vm.stopPrank();
         /* -------------------------------- */ 
 
@@ -103,11 +94,138 @@ contract CanonicalGovernorTest is GovernorBaseTest {
         require(finalVotes == STAKEHOLDER_MINOR);
     }
 
-    function testRedelegate() public {}
+    function testRedelegate() public {
+        /* ------PRIMARY-DELEGATOR------- */
+        vm.startPrank(DELEGATOR_PRIMARY);
+        governor.delegate(DELEGATEE_PRIMARY, block.timestamp + 1 days);
+        vm.stopPrank();
+        /* -------------------------------- */ 
 
-    function testRevoke() public {}
+        /* ------SECONDARY-DELEGATOR------- */
+        vm.startPrank(DELEGATOR_SECONDARY);
+        governor.delegate(DELEGATEE_SECONDARY, block.timestamp + 7 days);
+        vm.stopPrank();
+        /* -------------------------------- */ 
 
-    function testProxyVote() public {}
+        /* ------PRIMARY-DELEGATEE------- */
+        vm.startPrank(DELEGATEE_PRIMARY);
+        uint proposalId = pushMockProposal();
+
+        vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
+
+        governor.castVote(proposalId, 1, "");
+        // Cant use expired delegation 
+        vm.expectRevert();
+        governor.castVirtualVote(proposalId, 1, DELEGATOR_PRIMARY);
+        /* -------------------------------- */ 
+
+        /* ------PRIMARY-DELEGATOR------- */
+        vm.startPrank(DELEGATOR_PRIMARY);
+        // Delegator can redelegate because of expiry
+        governor.redelegate(DELEGATEE_SECONDARY, block.timestamp + 1 days);
+        vm.stopPrank();
+        /* -------------------------------- */ 
+
+        /* ------PRIMARY-DELEGATEE------- */
+        vm.startPrank(DELEGATEE_PRIMARY);
+        // Cant use expired delegation 
+        vm.expectRevert();
+        governor.castVirtualVote(proposalId, 1, DELEGATOR_PRIMARY);
+        /* -------------------------------- */
+
+        /* ------SEOCNDARY-DELEGATEE------- */
+        vm.startPrank(DELEGATEE_SECONDARY);
+        governor.castVote(proposalId, 1, "");
+        governor.castVirtualVote(proposalId, 1, DELEGATOR_PRIMARY);
+        governor.castVirtualVote(proposalId, 1, DELEGATOR_SECONDARY);
+        /* -------------------------------- */ 
+
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
+
+        (, uint finalVotes,)= governor.getTally(proposalId);
+        require(finalVotes == STAKEHOLDER_MINOR * 4); 
+    }
+
+    function testRevoke() public {
+        /* ------PRIMARY-DELEGATOR------- */
+        vm.startPrank(DELEGATOR_PRIMARY);
+        governor.delegate(DELEGATEE_PRIMARY, block.timestamp + 7 days);
+        vm.stopPrank();
+        /* -------------------------------- */ 
+
+        /* ------PRIMARY-DELEGATEE------- */
+        vm.startPrank(DELEGATEE_PRIMARY);
+        uint proposalId = pushMockProposal();
+
+        vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
+
+        governor.castVote(proposalId, 1, "");
+        governor.castVirtualVote(proposalId, 1, DELEGATOR_PRIMARY);
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        /* ------PRIMARY-DELEGATOR------- */
+        vm.startPrank(DELEGATOR_PRIMARY);
+        // Delegator cant revoke with active vote 
+        vm.expectRevert();
+        governor.revoke();
+        //////////////////////////////////////
+        vm.stopPrank();
+        /* -------------------------------- */ 
+
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
+
+        /* ------PRIMARY-DELEGATOR------- */
+        vm.startPrank(DELEGATOR_PRIMARY);
+        // Delegator can now revoke 
+        governor.revoke();
+        vm.stopPrank();
+        /* -------------------------------- */     
+    }
+
+    function testProxyVote() public {
+        /* ------PRIMARY-DELEGATOR------- */
+        vm.startPrank(DELEGATOR_PRIMARY);
+        uint primaryTs = block.timestamp + 1 days;
+        governor.delegate(DELEGATEE_PRIMARY, primaryTs);
+        vm.stopPrank();
+        /* -------------------------------- */ 
+
+        /* ------SECONDARY-DELEGATOR------- */
+        vm.startPrank(DELEGATOR_SECONDARY);
+        uint secondaryTs = block.timestamp + 7 days;
+        governor.delegate(DELEGATEE_SECONDARY, secondaryTs);
+        vm.stopPrank();
+        /* -------------------------------- */ 
+
+        /* ------PRIMARY-DELEGATEE------- */
+        vm.startPrank(DELEGATEE_PRIMARY);
+        uint proposalId = pushMockProposal();
+
+        vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
+
+        governor.castVote(proposalId, 1, "");
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        bytes[] memory votes = new bytes[](1);
+        votes[0] = abi.encode(DELEGATOR_PRIMARY, DELEGATEE_PRIMARY, primaryTs);
+
+        // Fast forward to expire primary delegation
+        vm.warp(block.timestamp + 1 days);
+
+        // Vote cast should fail with expired delegation 
+        vm.expectRevert();
+        governor.batchProxyVotes(proposalId, votes);
+        /////////////////////////////////////
+        votes[0] = abi.encode(DELEGATOR_SECONDARY, DELEGATEE_SECONDARY, secondaryTs);
+        governor.batchProxyVotes(proposalId, votes);
+
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
+
+        (, uint finalVotes,)= governor.getTally(proposalId);
+        require(finalVotes == STAKEHOLDER_MINOR * 2); 
+    }
 
     function setUpScenario() internal {
         /* ------PRIMARY-DELEGATOR------- */
@@ -131,24 +249,6 @@ contract CanonicalGovernorTest is GovernorBaseTest {
         /* ------SECONDARY-DELEGATEE------- */
         vm.startPrank(DELEGATEE_SECONDARY);
         approveAndLock(STAKEHOLDER_MINOR);
-        vm.stopPrank();
-        /* -------------------------------- */ 
-
-        /* ------ALPHA-STAKEHOLDER------- */
-        vm.startPrank(STAKEHOLDER_ALPHA);
-        approveAndLock(STAKEHOLDER_MAJOR);
-        vm.stopPrank();
-        /* -------------------------------- */ 
-
-        /* ------BETA-STAKEHOLDER------- */
-        vm.startPrank(STAKEHOLDER_BETA);
-        approveAndLock(STAKEHOLDER_MAJOR);
-        vm.stopPrank();
-        /* -------------------------------- */
-
-        /* ------THETA-STAKEHOLDER------- */
-        vm.startPrank(STAKEHOLDER_THETA);
-        approveAndLock(STAKEHOLDER_MAJOR);
         vm.stopPrank();
         /* -------------------------------- */ 
     }
