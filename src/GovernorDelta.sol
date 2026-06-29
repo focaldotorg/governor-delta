@@ -169,6 +169,16 @@ contract GovernorDelta is GovernorStorageV3 {
     }
 
     /**
+      * @notice Gets the tally for a given proposal
+      * @param proposalId the id of proposal
+      * @return The voting tally 
+    **/
+    function getTally(uint proposalId) public view returns (uint, uint, uint) {
+        ProposalV2 storage p = proposals[proposalId];
+        return (p.results.primary.againstVotes, p.results.primary.forVotes, p.results.primary.abstainVotes);
+      }
+
+    /**
       * @notice Gets the receipt for a voter on a given proposal
       * @param proposalId the id of proposal
       * @param voter The address of the voter
@@ -176,12 +186,7 @@ contract GovernorDelta is GovernorStorageV3 {
     **/
     function getRecords(uint proposalId, address voter) public view returns (Record[4] memory) {
         ProposalV2 storage p = proposals[proposalId];
-        return [ 
-          p.results.primary.records[voter],
-          p.results.virtualized.records[voter], 
-          p.veto.primary.records[voter],
-          p.veto.virtualized.records[voter]
-        ]; 
+        return [p.results.primary.records[voter], p.results.virtualized.records[voter], p.veto.primary.records[voter], p.veto.virtualized.records[voter]]; 
     }
 
     /**
