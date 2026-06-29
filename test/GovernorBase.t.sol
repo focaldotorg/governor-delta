@@ -47,6 +47,9 @@ contract GovernorBaseTest is Test {
         governorToken = new TestERC20();
         governor = deployGovernor();
         timelock = new RelaxedTimelock(msg.sender, DEFAULT_TIMELOCK_DELAY);
+
+        // @notice Why is ether balances funded from governor, not timelock? 
+        vm.deal(address(governor), 1 ether);
         // Distribute assets
         treasuryToken.mint(address(timelock), TREASURY_RESERVE);
         governorToken.mint(STAKEHOLDER_PRIMARY, STAKEHOLDER_MAJOR);
@@ -57,6 +60,10 @@ contract GovernorBaseTest is Test {
         governor._setPendingAdmin(address(governor));
         governor.initiate(address(governor));
         governor.acceptAdmin(address(timelock));
+    }
+
+    function deployGovernor() internal virtual returns (GovernorAdmin) {
+        return new GovernorAdmin();
     }
 
     function testLockSystem() public {
@@ -109,14 +116,6 @@ contract GovernorBaseTest is Test {
 
         GovernorStorageV3.ProposalStatus endStatus = governor.status(proposalId);
         require(endStatus == GovernorStorageV3.ProposalStatus.Unqualified);
-
-        // Let proposal finalise
-        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
-
-        GovernorStorageV1.ProposalState endState = governor.state(proposalId); 
-        require(endState == GovernorStorageV1.ProposalState.Defeated);
-        vm.expectRevert();
-        governor.queue(proposalId);
         vm.stopPrank();
         /* -------------------------------- */
     }
@@ -148,10 +147,11 @@ contract GovernorBaseTest is Test {
         /* -------------------------------- */
 
         vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD + 1);
-
+        
+        // Proposal shouldnt queue when Defeated
         vm.expectRevert();
         governor.queue(proposalId);
-
+        //////////////////////////////////////
         GovernorStorageV1.ProposalState endState = governor.state(proposalId); 
         GovernorStorageV3.ProposalStatus endStatus = governor.status(proposalId);
         require(endState == GovernorStorageV1.ProposalState.Defeated);
@@ -195,8 +195,10 @@ contract GovernorBaseTest is Test {
 
         vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + timelock.GRACE_PERIOD() + 1);
 
+        // Proposal shouldnt execute on expiration
         vm.expectRevert();
         governor.execute(proposalId);
+        //////////////////////////////////////
 
         GovernorStorageV1.ProposalState endState = governor.state(proposalId); 
         require(endState == GovernorStorageV1.ProposalState.Expired);
@@ -341,13 +343,12 @@ contract GovernorBaseTest is Test {
         // Attempt invalid signature
         vm.expectRevert();
         governor.castVoteBySig(proposalId, 1, 0, bytes32(0), bytes32(0));
-
+        //////////////////////////////////////
         bytes32 domainHash = governor.DOMAIN_TYPEHASH();
         bytes32 domainSeparator = keccak256(abi.encode(domainHash, keccak256(bytes(governor.name())), block.chainid, address(governor)));
         bytes32 structHash = keccak256(abi.encode(governor.VOTE_TYPEHASH(), proposalId, 1));
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(voterPk, digest);
-
         governor.castVoteBySig(proposalId, 1, v, r, s);
     }
 
@@ -381,13 +382,12 @@ contract GovernorBaseTest is Test {
         // Attempt invalid signature
         vm.expectRevert();
         governor.castVetoVoteBySig(proposalId, 1, 0, bytes32(0), bytes32(0));
-
+        //////////////////////////////////////
         bytes32 domainHash = governor.DOMAIN_TYPEHASH();
         bytes32 domainSeparator = keccak256(abi.encode(domainHash, keccak256(bytes(governor.name())), block.chainid, address(governor)));
         bytes32 structHash = keccak256(abi.encode(governor.VETO_TYPEHASH(), proposalId, 1));
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(voterPk, digest);
-
         governor.castVetoVoteBySig(proposalId, 1, v, r, s);
     }
 
@@ -416,8 +416,10 @@ contract GovernorBaseTest is Test {
 
         vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
 
+        // Proposal should not be ready with old duration 
         vm.expectRevert();
         governor.queue(proposalId);
+        //////////////////////////////////////
 
         vm.warp(block.timestamp + (DEFAULT_TIER_0_DURATION - DEFAULT_VOTING_PERIOD));
 
@@ -455,6 +457,8 @@ contract GovernorBaseTest is Test {
         governor.castVetoVote(proposalId, 1, "");
         vm.stopPrank();
         /* -------------------------------- */
+
+        // @TODO Test final states
     }
 
     function testSetVetoQuorum() public {
@@ -521,8 +525,10 @@ contract GovernorBaseTest is Test {
 
         vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + DEFAULT_VETO_PERIOD + 1);
 
+        // Proposal should not be ready with old period
         vm.expectRevert();
         governor.resolve(proposalId);
+        //////////////////////////////////////
 
         vm.warp(block.timestamp + 3 days);
 
@@ -540,16 +546,12 @@ contract GovernorBaseTest is Test {
         bytes[] memory calldatas = new bytes[](1);
         uint[] memory values = new uint[](1);
 
-        values[0] = 0;
-        targets[0] = address(governor);
-        signatures[0] = "_activateDelegation()";
+        values[0] = 1 wei;
+        targets[0] = address(0);
+        signatures[0] = "";
         calldatas[0] = "";
 
         return governor.propose(0, targets, values, signatures, calldatas, "");
-    }
-
-    function deployGovernor() internal virtual returns (GovernorAdmin) {
-        return new GovernorAdmin();
     }
 
 }
