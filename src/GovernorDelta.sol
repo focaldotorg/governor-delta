@@ -285,7 +285,6 @@ contract GovernorDelta is GovernorStorageV3 {
         require(s.unlockTime < block.timestamp, "GovernorDelta::withdraw: active vote or delegation");
         uint256 deltaTime = block.timestamp - s.lastUpdateTime;
         s.lastUpdateTime = block.timestamp;
-        s.deltaAmountTime += s.amount * deltaTime;
         s.amount -= amount;
         totalStaked -= amount;
 
