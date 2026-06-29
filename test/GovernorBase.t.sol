@@ -68,8 +68,7 @@ contract GovernorBaseTest is Test {
 
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
-        governorToken.approve(address(governor), STAKEHOLDER_MAJOR);
-        governor.lock(STAKEHOLDER_MAJOR);
+        approveAndLock(STAKEHOLDER_MAJOR);
         vm.stopPrank();
         /* -------------------------------- */
 
@@ -100,25 +99,24 @@ contract GovernorBaseTest is Test {
     function testInvalidProposal() public {
         /* ------TERNARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_TERNARY);
-        governorToken.approve(address(governor), STAKEHOLDER_MINOR);
-        governor.lock(STAKEHOLDER_MINOR);
-        pushMockProposal();
+        approveAndLock(STAKEHOLDER_MINOR);
+        uint proposalId = pushMockProposal();
 
         // Factor for voting delay
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
-        governor.castVote(2, 1, "");
+        governor.castVote(proposalId, 1, "");
 
-        GovernorStorageV3.ProposalStatus endStatus = governor.status(2);
+        GovernorStorageV3.ProposalStatus endStatus = governor.status(proposalId);
         require(endStatus == GovernorStorageV3.ProposalStatus.Unqualified);
 
         // Let proposal finalise
         vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
 
-        GovernorStorageV1.ProposalState endState = governor.state(2); 
+        GovernorStorageV1.ProposalState endState = governor.state(proposalId); 
         require(endState == GovernorStorageV1.ProposalState.Defeated);
         vm.expectRevert();
-        governor.queue(2);
+        governor.queue(proposalId);
         vm.stopPrank();
         /* -------------------------------- */
     }
@@ -127,35 +125,35 @@ contract GovernorBaseTest is Test {
         /* ------TERNARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_TERNARY);
         approveAndLock(STAKEHOLDER_MINOR);
-        pushMockProposal();
+        uint proposalId = pushMockProposal();
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
-        governor.castVote(2, 1, "");
+        governor.castVote(proposalId, 1, "");
         vm.stopPrank();
         /* -------------------------------- */
 
         /* ------SECONDARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_SECONDARY);
         approveAndLock(STAKEHOLDER_MAJOR);
-        governor.castVote(2, 0, "");
+        governor.castVote(proposalId, 0, "");
         vm.stopPrank();
         /* -------------------------------- */
 
        /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
         approveAndLock(STAKEHOLDER_MAJOR);
-        governor.castVote(2, 0, "");
+        governor.castVote(proposalId, 0, "");
         vm.stopPrank();
         /* -------------------------------- */
 
         vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD + 1);
 
         vm.expectRevert();
-        governor.queue(2);
+        governor.queue(proposalId);
 
-        GovernorStorageV1.ProposalState endState = governor.state(2); 
-        GovernorStorageV3.ProposalStatus endStatus = governor.status(2);
+        GovernorStorageV1.ProposalState endState = governor.state(proposalId); 
+        GovernorStorageV3.ProposalStatus endStatus = governor.status(proposalId);
         require(endState == GovernorStorageV1.ProposalState.Defeated);
         require(endStatus == GovernorStorageV3.ProposalStatus.Resolved);
     }
@@ -164,19 +162,19 @@ contract GovernorBaseTest is Test {
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
         approveAndLock(STAKEHOLDER_MAJOR);
-        pushMockProposal();
+        uint proposalId = pushMockProposal();
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
-        governor.castVote(2, 1, "");
+        governor.castVote(proposalId, 1, "");
 
         vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
 
-        governor.queue(2);
+        governor.queue(proposalId);
 
         vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + DEFAULT_VETO_PERIOD + 1);
 
-        governor.execute(2);
+        governor.execute(proposalId);
         vm.stopPrank();
         /* -------------------------------- */
     }
@@ -185,22 +183,22 @@ contract GovernorBaseTest is Test {
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
         approveAndLock(STAKEHOLDER_MAJOR);
-        pushMockProposal();
+        uint proposalId = pushMockProposal();
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
-        governor.castVote(2, 1, "");
+        governor.castVote(proposalId, 1, "");
 
         vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
 
-        governor.queue(2);
+        governor.queue(proposalId);
 
         vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + timelock.GRACE_PERIOD() + 1);
 
         vm.expectRevert();
-        governor.execute(2);
+        governor.execute(proposalId);
 
-        GovernorStorageV1.ProposalState endState = governor.state(2); 
+        GovernorStorageV1.ProposalState endState = governor.state(proposalId); 
         require(endState == GovernorStorageV1.ProposalState.Expired);
         vm.stopPrank();
     }
@@ -209,15 +207,15 @@ contract GovernorBaseTest is Test {
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
         approveAndLock(STAKEHOLDER_MAJOR);
-        pushMockProposal();
+        uint proposalId = pushMockProposal();
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
-        governor.castVote(2, 1, "");
+        governor.castVote(proposalId, 1, "");
 
         vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
 
-        governor.queue(2);
+        governor.queue(proposalId);
         vm.stopPrank();
         /* -------------------------------- */
 
@@ -226,33 +224,33 @@ contract GovernorBaseTest is Test {
         /* ------SECONDARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_SECONDARY);
         approveAndLock(STAKEHOLDER_MAJOR);
-        governor.veto(2);
-        governor.castVetoVote(2, 0, "");
+        governor.veto(proposalId);
+        governor.castVetoVote(proposalId, 0, "");
         vm.stopPrank();
         /* -------------------------------- */
 
-        GovernorStorageV3.ProposalStatus priorStatus = governor.status(2); 
+        GovernorStorageV3.ProposalStatus priorStatus = governor.status(proposalId); 
         require(priorStatus == GovernorStorageV3.ProposalStatus.Contested);
 
         /* ------TERNARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_TERNARY);
         approveAndLock(STAKEHOLDER_MINOR);
-        governor.castVetoVote(2, 1, "");
+        governor.castVetoVote(proposalId, 1, "");
         vm.stopPrank();
         /* -------------------------------- */
 
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
-        governor.castVetoVote(2, 0, "");
+        governor.castVetoVote(proposalId, 0, "");
         vm.stopPrank();
         /* -------------------------------- */
 
         vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + DEFAULT_VETO_PERIOD + 1);
 
-        governor.execute(2);
+        governor.execute(proposalId);
 
-        GovernorStorageV1.ProposalState endState = governor.state(2); 
-        GovernorStorageV3.ProposalStatus endStatus = governor.status(2); 
+        GovernorStorageV1.ProposalState endState = governor.state(proposalId); 
+        GovernorStorageV3.ProposalStatus endStatus = governor.status(proposalId); 
         require(endStatus == GovernorStorageV3.ProposalStatus.Resolved);
         require(endState == GovernorStorageV1.ProposalState.Executed);
     }
@@ -261,44 +259,44 @@ contract GovernorBaseTest is Test {
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
         approveAndLock(STAKEHOLDER_MAJOR);
-        pushMockProposal();
+        uint proposalId = pushMockProposal();
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
-        governor.castVote(2, 1, "");
+        governor.castVote(proposalId, 1, "");
 
         vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
 
-        governor.queue(2);
+        governor.queue(proposalId);
         vm.stopPrank();
         /* -------------------------------- */
 
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_SECONDARY);
         approveAndLock(STAKEHOLDER_MAJOR);
-        governor.veto(2);
-        governor.castVetoVote(2, 1, "");
+        governor.veto(proposalId);
+        governor.castVetoVote(proposalId, 1, "");
         vm.stopPrank();
         /* -------------------------------- */
 
-        GovernorStorageV3.ProposalStatus priorStatus = governor.status(2); 
+        GovernorStorageV3.ProposalStatus priorStatus = governor.status(proposalId); 
         require(priorStatus == GovernorStorageV3.ProposalStatus.Contested);
 
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
-        governor.castVetoVote(2, 1, "");
+        governor.castVetoVote(proposalId, 1, "");
         vm.stopPrank();
         /* -------------------------------- */ 
 
         vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + DEFAULT_VETO_PERIOD + 1);
 
-        GovernorStorageV3.ProposalStatus postStatus = governor.status(2); 
+        GovernorStorageV3.ProposalStatus postStatus = governor.status(proposalId); 
         require(postStatus == GovernorStorageV3.ProposalStatus.Dropped);
 
-        governor.resolve(2);
+        governor.resolve(proposalId);
 
-        GovernorStorageV1.ProposalState endState = governor.state(2);
-        GovernorStorageV3.ProposalStatus endStatus = governor.status(2);
+        GovernorStorageV1.ProposalState endState = governor.state(proposalId);
+        GovernorStorageV3.ProposalStatus endStatus = governor.status(proposalId);
         require(endStatus == GovernorStorageV3.ProposalStatus.Resolved);
         require(endState == GovernorStorageV1.ProposalState.Canceled);
     }
@@ -307,14 +305,14 @@ contract GovernorBaseTest is Test {
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
         approveAndLock(STAKEHOLDER_MAJOR);
-        pushMockProposal();
+        uint proposalId = pushMockProposal();
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
-        governor.cancel(2);
+        governor.cancel(proposalId);
 
-        GovernorStorageV1.ProposalState endState = governor.state(2);
-        GovernorStorageV3.ProposalStatus endStatus = governor.status(2);
+        GovernorStorageV1.ProposalState endState = governor.state(proposalId);
+        GovernorStorageV3.ProposalStatus endStatus = governor.status(proposalId);
         require(endStatus == GovernorStorageV3.ProposalStatus.Resolved);
         require(endState == GovernorStorageV1.ProposalState.Canceled);
     }
@@ -333,24 +331,24 @@ contract GovernorBaseTest is Test {
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
         approveAndLock(STAKEHOLDER_MAJOR);
-        pushMockProposal();
+        uint proposalId = pushMockProposal();
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
-        governor.castVote(2, 1, "");
+        governor.castVote(proposalId, 1, "");
         /* -------------------------------- */
 
         // Attempt invalid signature
         vm.expectRevert();
-        governor.castVoteBySig(2, 1, 0, bytes32(0), bytes32(0));
+        governor.castVoteBySig(proposalId, 1, 0, bytes32(0), bytes32(0));
 
         bytes32 domainHash = governor.DOMAIN_TYPEHASH();
         bytes32 domainSeparator = keccak256(abi.encode(domainHash, keccak256(bytes(governor.name())), block.chainid, address(governor)));
-        bytes32 structHash = keccak256(abi.encode(governor.VOTE_TYPEHASH(), 2, 1));
+        bytes32 structHash = keccak256(abi.encode(governor.VOTE_TYPEHASH(), proposalId, 1));
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(voterPk, digest);
 
-        governor.castVoteBySig(2, 1, v, r, s);
+        governor.castVoteBySig(proposalId, 1, v, r, s);
     }
 
     function testVetoVoteBySig() public {
@@ -367,30 +365,30 @@ contract GovernorBaseTest is Test {
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
         approveAndLock(STAKEHOLDER_MAJOR);
-        pushMockProposal();
+        uint proposalId = pushMockProposal();
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
-        governor.castVote(2, 1, "");
+        governor.castVote(proposalId, 1, "");
 
         vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD + 1);
 
-        governor.queue(2);
-        governor.veto(2);
+        governor.queue(proposalId);
+        governor.veto(proposalId);
         vm.stopPrank();
         /* -------------------------------- */
 
         // Attempt invalid signature
         vm.expectRevert();
-        governor.castVetoVoteBySig(2, 1, 0, bytes32(0), bytes32(0));
+        governor.castVetoVoteBySig(proposalId, 1, 0, bytes32(0), bytes32(0));
 
         bytes32 domainHash = governor.DOMAIN_TYPEHASH();
         bytes32 domainSeparator = keccak256(abi.encode(domainHash, keccak256(bytes(governor.name())), block.chainid, address(governor)));
-        bytes32 structHash = keccak256(abi.encode(governor.VETO_TYPEHASH(), 2, 1));
+        bytes32 structHash = keccak256(abi.encode(governor.VETO_TYPEHASH(), proposalId, 1));
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(voterPk, digest);
 
-        governor.castVetoVoteBySig(2, 1, v, r, s);
+        governor.castVetoVoteBySig(proposalId, 1, v, r, s);
     }
 
     function testProposalConfig() public {
@@ -410,20 +408,20 @@ contract GovernorBaseTest is Test {
         /* ------TERNARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_TERNARY);
         approveAndLock(STAKEHOLDER_MINOR);
-        pushMockProposal();
+        uint proposalId = pushMockProposal();
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
-        governor.castVote(2, 1, "");
+        governor.castVote(proposalId, 1, "");
 
         vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
 
         vm.expectRevert();
-        governor.queue(2);
+        governor.queue(proposalId);
 
         vm.warp(block.timestamp + (DEFAULT_TIER_0_DURATION - DEFAULT_VOTING_PERIOD));
 
-        governor.queue(2);
+        governor.queue(proposalId);
         vm.stopPrank();
         /* -------------------------------- */
     }
@@ -438,23 +436,23 @@ contract GovernorBaseTest is Test {
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
         approveAndLock(STAKEHOLDER_MAJOR); 
-        pushMockProposal();
+        uint proposalId = pushMockProposal();
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
-        governor.castVote(2, 1, "");
+        governor.castVote(proposalId, 1, "");
 
         vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
 
-        governor.queue(2);
+        governor.queue(proposalId);
         vm.stopPrank();
         /* -------------------------------- */
 
         /* ------TERNARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_TERNARY);
         approveAndLock(STAKEHOLDER_MINOR);
-        governor.veto(2);
-        governor.castVetoVote(2, 1, "");
+        governor.veto(proposalId);
+        governor.castVetoVote(proposalId, 1, "");
         vm.stopPrank();
         /* -------------------------------- */
     }
@@ -469,31 +467,31 @@ contract GovernorBaseTest is Test {
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
         approveAndLock(STAKEHOLDER_MAJOR);
-        pushMockProposal();
+        uint proposalId = pushMockProposal();
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
-        governor.castVote(2, 1, "");
+        governor.castVote(proposalId, 1, "");
 
         vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
 
-        governor.queue(2);
-        governor.veto(2);
+        governor.queue(proposalId);
+        governor.veto(proposalId);
         vm.stopPrank();
         /* -------------------------------- */
 
         /* ------TERNARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_TERNARY);
         approveAndLock(STAKEHOLDER_MINOR);
-        governor.castVetoVote(2, 1, "");
+        governor.castVetoVote(proposalId, 1, "");
         vm.stopPrank();
         /* -------------------------------- */
 
         vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + DEFAULT_VETO_PERIOD + 1);
 
-        governor.resolve(2);
+        governor.resolve(proposalId);
 
-        GovernorStorageV1.ProposalState endState = governor.state(2);
+        GovernorStorageV1.ProposalState endState = governor.state(proposalId);
         require(endState == GovernorStorageV1.ProposalState.Canceled);
     }
 
@@ -507,28 +505,28 @@ contract GovernorBaseTest is Test {
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
         approveAndLock(STAKEHOLDER_MAJOR);
-        pushMockProposal();
+        uint proposalId = pushMockProposal();
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
-        governor.castVote(2, 1, "");
+        governor.castVote(proposalId, 1, "");
 
         vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
 
-        governor.queue(2);
-        governor.veto(2);
-        governor.castVetoVote(2, 1, "");
+        governor.queue(proposalId);
+        governor.veto(proposalId);
+        governor.castVetoVote(proposalId, 1, "");
         vm.stopPrank();
         /* -------------------------------- */
 
         vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + DEFAULT_VETO_PERIOD + 1);
 
         vm.expectRevert();
-        governor.resolve(2);
+        governor.resolve(proposalId);
 
         vm.warp(block.timestamp + 3 days);
 
-        governor.resolve(2);
+        governor.resolve(proposalId);
     }
 
     function approveAndLock(uint amount) internal {
@@ -536,7 +534,7 @@ contract GovernorBaseTest is Test {
         governor.lock(amount);
     }
 
-    function pushMockProposal() internal {
+    function pushMockProposal() internal returns (uint) {
         address[] memory targets = new address[](1);
         string[] memory signatures = new string[](1);
         bytes[] memory calldatas = new bytes[](1);
@@ -547,7 +545,7 @@ contract GovernorBaseTest is Test {
         signatures[0] = "_activateDelegation()";
         calldatas[0] = "";
 
-        governor.propose(0, targets, values, signatures, calldatas, "");
+        return governor.propose(0, targets, values, signatures, calldatas, "");
     }
 
     function deployGovernor() internal virtual returns (GovernorAdmin) {
