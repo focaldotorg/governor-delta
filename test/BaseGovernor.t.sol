@@ -9,7 +9,7 @@ import { GovernorAdmin } from "./mock/GovernorAdmin.sol";
 import { TestERC20 } from "./mock/TestERC20.sol";
 import { RelaxedTimelock } from "./mock/RelaxedTimelock.sol";
 
-contract GovernorBaseTest is Test {
+contract BaseGovernorTest is Test {
 
     RelaxedTimelock timelock;
     GovernorAdmin governor;

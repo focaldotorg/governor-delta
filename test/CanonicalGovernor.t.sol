@@ -1,9 +1,9 @@
 pragma solidity ^0.8.13;
 
 import { GovernorAdmin } from "./mock/GovernorAdmin.sol";
-import { GovernorBaseTest } from "./GovernorBase.t.sol";
+import { BaseGovernorTest } from "./BaseGovernor.t.sol";
 
-contract CanonicalGovernorTest is GovernorBaseTest {
+contract CanonicalGovernorTest is BaseGovernorTest {
 
     address public constant DELEGATOR_PRIMARY     = 0x8A1c5E88Ca465be1D01e4B437CE4E082fD14E25e;
     address public constant DELEGATOR_SECONDARY   = 0xE0D268481983B218e83DEe30da1c9f36B56Ffa0a;
