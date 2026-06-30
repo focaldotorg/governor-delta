@@ -6,8 +6,8 @@ import "@interfaces/IVotingStrategy.sol";
 
 contract TenureVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrategy {
 
-    IGovernorDelta public governor; 
     Tranche[] public tranches;
+    IGovernorDelta public governor; 
 
     uint constant public MULTIPLIER_UNIT = 1e8;
 
@@ -32,7 +32,7 @@ contract TenureVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrategy {
 
     function power(address owner) external returns (uint) {
         (uint balance, uint deltaAmountTime) = governor.stake(owner);
-        uint effectiveTime = balance / deltaAmountTime;
+        uint effectiveTime = deltaAmountTime / balance;
         Tranche memory tranche = getTranche(owner, effectiveTime);
         return balance * tranche.multiplier / MULTIPLIER_UNIT; 
     }
@@ -41,7 +41,7 @@ contract TenureVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrategy {
         if (timestamp < block.timestamp) return 0;
 
         (uint balance, uint deltaAmountTime) = governor.stake(owner);
-        uint effectiveTime = balance / deltaAmountTime;
+        uint effectiveTime = deltaAmountTime / balance;
         uint futureTime = effectiveTime + (timestamp - block.timestamp);
         Tranche memory tranche = getTranche(owner, futureTime);
         return balance * tranche.multiplier / MULTIPLIER_UNIT; 
