@@ -69,14 +69,14 @@ contract TenureVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrategy {
     function checkTranches(Tranche[] memory config) public pure returns (bool) {
         if (config.length > MAX_TRANCHE_COUNT) return false;
 
-        for (uint8 i = 0; i < config.length - 1; i++) {
+        for (uint8 i = 0; i < config.length; i++) {
             Tranche memory target = config[i];
 
             if (target.size < MIN_TRANCHE_SIZE) return false;
             if (target.size > MAX_TRANCHE_SIZE) return false;
             if (target.multiplier < MULTIPLIER_UNIT) return false;
             if (target.multiplier >= MAX_MULTIPLIER) return false;
-            if (i == config.length - 1) break;
+            if (i == config.length) break;
             if (target.size >= config[i + 1].size) return false;
             if (target.multiplier >= config[i + 1].multiplier) return false;
         }
