@@ -38,11 +38,11 @@ contract TenureVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrategy {
     }
 
     function predict(address owner, uint timestamp) external returns (uint) {
-        if (timestamp > block.timestamp) return 0;
+        if (timestamp < block.timestamp) return 0;
 
         (uint balance, uint deltaAmountTime) = governor.stake(owner);
         uint effectiveTime = balance / deltaAmountTime;
-        uint futureTime = effectiveTime + (block.timestamp - timestamp);
+        uint futureTime = effectiveTime + (timestamp - block.timestamp);
         Tranche storage tranche = getTranche(owner, futureTime);
         return balance * tranche.multiplier / MULTIPLIER_UNIT; 
     }
