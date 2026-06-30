@@ -6,10 +6,11 @@ import "@interfaces/IVotingStrategy.sol";
 
 contract TenureVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrategy {
 
-    IGovernorDelta governor;
+    IGovernorDelta public governor; 
+    Tranche[] public tranches;
 
-    constructor(address delta_) {
-        governor = IGovernorDelta(delta_);
+    constructor(address governor_) {
+        governor = IGovernorDelta(governor_);
     }
 
     function virtualized() external returns (bool) {
