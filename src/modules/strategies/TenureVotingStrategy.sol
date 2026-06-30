@@ -53,7 +53,7 @@ contract TenureVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrategy {
     }
 
     function getTranche(address owner, uint time) public returns (Tranche memory) {
-        Tranche memory selector; 
+        Tranche memory selector = tranches[0]; 
 
         for (uint8 i = 0; i < tranches.length; i++) {
             if (time >= tranches[i].size) {
