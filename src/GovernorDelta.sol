@@ -286,6 +286,7 @@ contract GovernorDelta is GovernorStorageV3 {
         uint256 deltaTime = block.timestamp - s.lastUpdateTime;
         s.lastUpdateTime = block.timestamp;
         s.deltaAmountTime += s.amount * deltaTime;
+        s.deltaAmountTime = s.deltaAmountTime * (s.amount - amount) / s.amount;  
         s.amount -= amount;
         totalStaked -= amount;
 

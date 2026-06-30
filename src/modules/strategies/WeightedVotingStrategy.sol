@@ -5,7 +5,7 @@ import "@interfaces/IVotingStrategy.sol";
 
 contract WeightedVotingStrategy is IVotingStrategy {
 
-    IGovernorDelta governor;
+    IGovernorDelta public governor;
 
     constructor(address delta_) {
         governor = IGovernorDelta(delta_);

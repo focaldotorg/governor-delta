@@ -5,10 +5,10 @@ import { BaseGovernorTest } from "./BaseGovernor.t.sol";
 
 contract CanonicalGovernorTest is BaseGovernorTest {
 
-    address public constant DELEGATOR_PRIMARY     = 0x8A1c5E88Ca465be1D01e4B437CE4E082fD14E25e;
-    address public constant DELEGATOR_SECONDARY   = 0xE0D268481983B218e83DEe30da1c9f36B56Ffa0a;
-    address public constant DELEGATEE_PRIMARY     = 0x557a4fC606ae646F585BC73aD2a4fc745a8CBcc8;
-    address public constant DELEGATEE_SECONDARY   = 0xCbFD1745E492F6a555dF7A9B1E0B3Cd139e69504;
+    address public constant DELEGATOR_PRIMARY = 0x8A1c5E88Ca465be1D01e4B437CE4E082fD14E25e;
+    address public constant DELEGATOR_SECONDARY = 0xE0D268481983B218e83DEe30da1c9f36B56Ffa0a;
+    address public constant DELEGATEE_PRIMARY = 0x557a4fC606ae646F585BC73aD2a4fc745a8CBcc8;
+    address public constant DELEGATEE_SECONDARY = 0xCbFD1745E492F6a555dF7A9B1E0B3Cd139e69504;
 
     function setUp() public override {
         super.setUp(); 
