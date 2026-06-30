@@ -52,7 +52,7 @@ contract TenureVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrategy {
         return balance;
     }
 
-    function getTranche(address owner, uint time) external returns (Tranche storage) {
+    function getTranche(address owner, uint time) public returns (Tranche storage) {
         Tranche storage selector; 
 
         for (uint8 i = 0; i < tranches.length; i++) {
@@ -66,7 +66,7 @@ contract TenureVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrategy {
         return selector;
     } 
 
-    function checkTranches(Tranche[] memory config) external pure returns (bool) {
+    function checkTranches(Tranche[] memory config) public pure returns (bool) {
         if (config.length > MAX_TRANCHE_COUNT) return false;
 
         for (uint8 i = 0; i < config.length - 1; i++) {
@@ -75,7 +75,7 @@ contract TenureVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrategy {
             if (target.size < MIN_TRANCHE_SIZE) return false;
             if (target.size > MAX_TRANCHE_SIZE) return false;
             if (target.multiplier < MULTIPLIER_UNIT) return false;
-            if (target.multiplier => MAX_MULTIPLIER) return false;
+            if (target.multiplier >= MAX_MULTIPLIER) return false;
             if (i == config.length - 1) break;
             if (target.size >= config[i + 1].size) return false;
             if (target.multiplier >= config[i + 1].multiplier) return false;
@@ -84,10 +84,10 @@ contract TenureVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrategy {
         return true;
     } 
 
-    function _setTranches(Tranches[] memory config) external {
-        require(checkTranches(tranches_), "TenureVotingStrategy::checkTranches: invalid config");
+    function _setTranches(Tranche[] memory config) external {
+        require(checkTranches(config), "TenureVotingStrategy::checkTranches: invalid config");
         require(msg.sender == address(governor), "TenureVotingStrategy::_setTranches: governor only");
-        Tranches[] storage oldTranches = tranches;
+        Tranche[] storage oldTranches = tranches;
         tranches = config;
 
         emit NewTranches(oldTranches, tranches);
