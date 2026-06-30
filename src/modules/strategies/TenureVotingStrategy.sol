@@ -33,7 +33,7 @@ contract TenureVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrategy {
     function power(address owner) external returns (uint) {
         (uint balance, uint deltaAmountTime) = governor.stake(owner);
         uint effectiveTime = balance / deltaAmountTime;
-        Tranche storage tranche = getTranche(owner, effectiveTime);
+        Tranche memory tranche = getTranche(owner, effectiveTime);
         return balance * tranche.multiplier / MULTIPLIER_UNIT; 
     }
 
@@ -43,7 +43,7 @@ contract TenureVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrategy {
         (uint balance, uint deltaAmountTime) = governor.stake(owner);
         uint effectiveTime = balance / deltaAmountTime;
         uint futureTime = effectiveTime + (timestamp - block.timestamp);
-        Tranche storage tranche = getTranche(owner, futureTime);
+        Tranche memory tranche = getTranche(owner, futureTime);
         return balance * tranche.multiplier / MULTIPLIER_UNIT; 
     }
 
@@ -52,8 +52,8 @@ contract TenureVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrategy {
         return balance;
     }
 
-    function getTranche(address owner, uint time) public returns (Tranche storage) {
-        Tranche storage selector; 
+    function getTranche(address owner, uint time) public returns (Tranche memory) {
+        Tranche memory selector; 
 
         for (uint8 i = 0; i < tranches.length; i++) {
             if (time >= tranches[i].size) {
