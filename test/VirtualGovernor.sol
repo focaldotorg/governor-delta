@@ -22,7 +22,7 @@ contract VirtualGovernorTest is BaseGovernorTest {
         governorToken.mint(DELEGATEE_PRIMARY, STAKEHOLDER_MINOR);
         governorToken.mint(DELEGATEE_SECONDARY, STAKEHOLDER_MINOR);
 
-        ITimeWeightedVotingStrategy.Tranche[] memory tranches;
+        ITimeWeightedVotingStrategy.Tranche[] memory tranches = new ITimeWeightedVotingStrategy.Tranche[](5);
 
         tranches[0] = ITimeWeightedVotingStrategy.Tranche(30 days, 10e6);
         tranches[1] = ITimeWeightedVotingStrategy.Tranche(60 days, 12e6);
