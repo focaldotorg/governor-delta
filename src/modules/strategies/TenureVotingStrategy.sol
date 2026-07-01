@@ -24,7 +24,7 @@ contract TenureVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrategy {
     /// @notice Maximum tranche total 
     uint constant public MAX_TRANCHE_COUNT = 10;
 
-    constructor(address governor_, Tranche[] memory tranches_) {
+    constructor(address governor_, Tranche[] memory tranches_) public {
         require(checkTranches(tranches_), "TenureVotingStrategy::checkTranches: invalid config");
 
         governor = IGovernorDelta(governor_);
@@ -125,7 +125,6 @@ contract TenureVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrategy {
 
     /**
       * @notice Admin function to set the tranche configuration 
-      * @param owner The address to query for
       * @param config The tranche config array
     **/
     function _setTranches(Tranche[] memory config) external {
