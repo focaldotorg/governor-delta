@@ -11,21 +11,41 @@ contract WeightedVotingStrategy is IVotingStrategy {
         governor = IGovernorDelta(delta_);
     }
 
-    function virtualized() external returns (bool) {
+    /**
+      * @notice Returns the modules configuration type 
+      * @return A boolean value to indicate whether the module has virtual weighting
+    **/
+    function virtualized() external pure returns (bool) {
         return false;
     }
 
-    function power(address owner) external returns (uint) {
+    /**
+      * @notice Returns the current voting power of a given account
+      * @param owner The address to query for
+      * @return The voting power of the account 
+    **/
+    function power(address owner) external view returns (uint) {
         (uint balance,) = governor.stake(owner);
         return balance;
     }
 
-    function predict(address owner, uint timestamp) external returns (uint) {
+    /**
+      * @notice Returns the future projected voting power of a given account
+      * @param owner The address to query for
+      * @param timestamp The future time to query the voting power at
+      * @return The future voting power of the account 
+    **/
+    function predict(address owner, uint timestamp) external view returns (uint) {
         (uint balance,) = governor.stake(owner);
         return balance;
     }
 
-    function weight(address owner) external returns (uint) {
+    /**
+      * @notice Returns the current voting weight of a given account
+      * @param owner The address to query for
+      * @return The voting weight of the account 
+    **/
+    function weight(address owner) external view returns (uint) {
         (uint balance,) = governor.stake(owner);
         return balance;
     }
