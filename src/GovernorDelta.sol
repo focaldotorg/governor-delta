@@ -198,7 +198,7 @@ contract GovernorDelta is GovernorStorageV3 {
         (address delegator, address delegatee, uint256 expiry) = abi.decode(id, (address, address, uint256));
         Delegate storage d = delegations[delegator];
 
-        if (d.expiry < block.timestamp && d.expiry > 0) {
+        if (d.expiry > block.timestamp) {
             return d.expiry == expiry && d.target == delegatee;
         } 
         return false; 
@@ -595,7 +595,7 @@ contract GovernorDelta is GovernorStorageV3 {
       * @param delegateIds The delegation identifiers to attest
     **/
     function batchAttestVotes(uint proposalId, bytes[] memory delegateIds) external {
-        // @TODO Think about conflict between veto mechanism
+        // @TODO Conflict wrt proposal cant be queued, but has sufficient votes to be attested that would suceed
         require(delegationActive, "GovernorDelta::batchAttestVotes: delegation not active");
         require(votingModule.virtualized(), "GovernorDelta::batchAttestVotes: unsupported virtualized voting strategy");
         require(state(proposalId) == ProposalState.Queued, "GovernorDelta::batchAttestVotes: proposal not in timelock");
