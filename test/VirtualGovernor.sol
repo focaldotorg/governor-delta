@@ -1,9 +1,13 @@
 pragma solidity ^0.8.13;
 
+import { ITimeWeightedVotingStrategy } from "@interfaces/ITimeWeightedVotingStrategy.sol";
+import { TenureVotingStrategy } from "@strategies/TenureVotingStrategy.sol";
 import { GovernorAdmin } from "./mock/GovernorAdmin.sol";
 import { BaseGovernorTest } from "./BaseGovernor.t.sol";
 
 contract VirtualGovernorTest is BaseGovernorTest {
+
+    TenureVotingStrategy strategy;
 
     address public constant DELEGATOR_PRIMARY = 0x8A1c5E88Ca465be1D01e4B437CE4E082fD14E25e;
     address public constant DELEGATOR_SECONDARY = 0xE0D268481983B218e83DEe30da1c9f36B56Ffa0a;
@@ -18,12 +22,23 @@ contract VirtualGovernorTest is BaseGovernorTest {
         governorToken.mint(DELEGATEE_PRIMARY, STAKEHOLDER_MINOR);
         governorToken.mint(DELEGATEE_SECONDARY, STAKEHOLDER_MINOR);
 
+        ITimeWeightedVotingStrategy.Tranche[] memory tranches;
+
+        tranches[0] = ITimeWeightedVotingStrategy.Tranche(30 days, 10e6);
+        tranches[1] = ITimeWeightedVotingStrategy.Tranche(60 days, 12e6);
+        tranches[2] = ITimeWeightedVotingStrategy.Tranche(90 days, 15e6);
+        tranches[3] = ITimeWeightedVotingStrategy.Tranche(180 days, 17e6);
+        tranches[4] = ITimeWeightedVotingStrategy.Tranche(365 days, 20e6);
+
+        strategy = new TenureVotingStrategy(address(governor), tranches);
+
         /* --------TIMELOCK-------- */
         vm.startPrank(address(timelock));
+        governor._setVotingModule(address(strategy));
         governor._activateDelegation();
         vm.stopPrank();
-        /* -------------------------------- */    
-        
+        /* -------------------------------- */
+
         setUpScenario();
     }
 

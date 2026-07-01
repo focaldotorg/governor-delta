@@ -10,10 +10,10 @@ contract TenureVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrategy {
     IGovernorDelta public governor; 
 
     /// @notice Base multiplier scaling unit 
-    uint constant public MULTIPLIER_UNIT = 1e8;
+    uint constant public MULTIPLIER_UNIT = 10e6;
 
     /// @notice Maximum multiplier value
-    uint constant public MAX_MULTIPLIER = 2e8;
+    uint constant public MAX_MULTIPLIER = 20e6;
 
     /// @notice Minimum tranche boundary / size 
     uint constant public MIN_TRANCHE_SIZE = 30 days;
