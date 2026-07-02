@@ -99,11 +99,11 @@ contract GovernorDelta is GovernorStorageV3 {
       * @notice Returns the stake of a given account
       * @param owner The address of the stakeholder
       * @return amount The total amount of tokens staked
-      * @return deltaAmountTime Capital-weighted time coefficient
+      * @return Contribution amount, stake time integral, last update timestamp
     **/
-    function stake(address owner) public view returns (uint, uint) {
+    function stake(address owner) public view returns (uint, uint, uint) {
         Stake storage s = stakes[owner];
-        return (s.amount, s.deltaAmountTime);
+        return (s.amount, s.deltaAmountTime, s.lastUpdateTime);
     }
 
     /**
@@ -308,11 +308,10 @@ contract GovernorDelta is GovernorStorageV3 {
     function propose(uint8 tier, address[] memory targets, uint[] memory values, string[] memory signatures, bytes[] memory calldatas, string memory description) public returns (uint) {
         require(tier < 4, "GovernorDelta::propose: Invalid proposal tier");
         Graduated storage framework = proposalConfig[tier];
-        (uint balance,) = stake(msg.sender); 
         // Reject proposals before initiating as Governor
         require(initialProposalId != 0, "GovernorDelta::propose: Governor not initialized");
         // Allow addresses above proposal threshold and whitelisted addresses to propose
-        require(balance >= framework.quota, "GovernorDelta::propose: proposer votes below proposal threshold");
+        require(stakes[msg.sender].amount >= framework.quota, "GovernorDelta::propose: proposer votes below proposal threshold");
         require(targets.length == values.length && targets.length == signatures.length && targets.length == calldatas.length, "GovernorDelta::propose: proposal function information arity mismatch");
         require(targets.length != 0, "GovernorDelta::propose: must provide actions");
         require(targets.length <= MAX_PROPOSAL_OPERATIONS, "GovernorDelta::propose: too many actions");
@@ -383,10 +382,9 @@ contract GovernorDelta is GovernorStorageV3 {
       * @param proposalId The id of the proposal to veto 
     **/
     function veto(uint proposalId) external {
-        (uint balance,) = stake(msg.sender);
         ProposalV2 storage proposal = proposals[proposalId];
         require(!proposal.contested, "GovernorDelta::veto: proposal already contested");
-        require(balance >= vetoQuota, "GovernorDelta::veto: insufficient balance for quota");
+        require(stakes[msg.sender].amount >= vetoQuota, "GovernorDelta::veto: insufficient balance for quota");
         require(block.timestamp < proposal.eta, "GovernorDelta::execute: veto period has elapsed");
         require(state(proposalId) == ProposalState.Queued, "GovernorDelta::veto: proposal can only be executed if it is queued");
         proposal.contested = true;

@@ -25,7 +25,7 @@ contract WeightedVotingStrategy is IVotingStrategy {
       * @return The voting power of the account 
     **/
     function power(address owner) external view returns (uint) {
-        (uint balance,) = governor.stake(owner);
+        (uint balance,,) = governor.stake(owner);
         return balance;
     }
 
@@ -36,7 +36,7 @@ contract WeightedVotingStrategy is IVotingStrategy {
       * @return The future voting power of the account 
     **/
     function predict(address owner, uint timestamp) external view returns (uint) {
-        (uint balance,) = governor.stake(owner);
+        (uint balance,,) = governor.stake(owner);
         return balance;
     }
 
@@ -46,7 +46,7 @@ contract WeightedVotingStrategy is IVotingStrategy {
       * @return The voting weight of the account 
     **/
     function weight(address owner) external view returns (uint) {
-        (uint balance,) = governor.stake(owner);
+        (uint balance,,) = governor.stake(owner);
         return balance;
     }
 
