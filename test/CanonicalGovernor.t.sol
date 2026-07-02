@@ -208,6 +208,12 @@ contract CanonicalGovernorTest is BaseGovernorTest {
         vm.stopPrank();
         /* -------------------------------- */
 
+        /* ------SECONDARY-DELEGATEE------- */
+        vm.startPrank(DELEGATEE_SECONDARY);
+        governor.castVote(proposalId, 1, "");
+        vm.stopPrank();
+        /* -------------------------------- */
+
         bytes[] memory votes = new bytes[](1);
         votes[0] = abi.encode(DELEGATOR_PRIMARY, DELEGATEE_PRIMARY, primaryTs);
 
@@ -224,7 +230,7 @@ contract CanonicalGovernorTest is BaseGovernorTest {
         vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
 
         (, uint finalVotes,)= governor.getTally(proposalId);
-        require(finalVotes == STAKEHOLDER_MINOR * 2); 
+        require(finalVotes == STAKEHOLDER_MINOR * 3); 
     }
 
     function setUpScenario() internal {

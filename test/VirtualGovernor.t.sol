@@ -144,11 +144,133 @@ contract VirtualGovernorTest is BaseGovernorTest {
         require(againstVotes == 25500e18);
     }
 
-    function testRedelegate() public {}
+    function testRedelegate() public {
+        /* ------PRIMARY-DELEGATOR------- */
+        vm.startPrank(DELEGATOR_PRIMARY);
+        uint primaryTs = block.timestamp + 7 days;
+        governor.delegate(DELEGATEE_PRIMARY, primaryTs);
+        vm.stopPrank();
+        /* -------------------------------- */ 
 
-    function testRevoke() public {}
+        /* ------SECONDARY-DELEGATOR------- */
+        vm.startPrank(DELEGATOR_SECONDARY);
+        uint secondaryTs = block.timestamp + 1 days;
+        governor.delegate(DELEGATEE_SECONDARY, secondaryTs);
+        vm.stopPrank();
+        /* -------------------------------- */ 
 
-    function testProxyVote() public {}
+        /* ------PRIMARY-DELEGATEE------- */
+        vm.startPrank(DELEGATEE_PRIMARY);
+        uint proposalId = pushMockProposal();
+
+        vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
+
+        governor.castVote(proposalId, 1, "");
+        governor.castVirtualVote(proposalId, 1, DELEGATOR_PRIMARY);
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        /* ------PRIMARY-DELEGATOR------- */
+        vm.startPrank(DELEGATOR_PRIMARY);
+        // Cant redelegate an active delegation without revoking
+        vm.expectRevert();
+        governor.redelegate(DELEGATOR_PRIMARY, block.timestamp + 7 days);
+        //////////////////////////////////////
+        vm.stopPrank();
+        /* -------------------------------- */ 
+
+        /* ------SECONDARY-DELEGATOR------- */
+        vm.startPrank(DELEGATOR_SECONDARY);
+        governor.redelegate(DELEGATOR_SECONDARY, block.timestamp + 7 days);
+        governor.castVote(proposalId, 1, "");
+        vm.stopPrank();
+        /* -------------------------------- */ 
+
+        /* ------SECONDARY-DELEGATEE------- */
+        vm.startPrank(DELEGATEE_SECONDARY);
+        governor.castVote(proposalId, 1, "");
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD + 1);
+
+        governor.queue(proposalId);
+
+        vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + 1);
+
+        bytes[] memory votes = new bytes[](1);
+        votes[0] = abi.encode(DELEGATOR_PRIMARY, DELEGATEE_PRIMARY, primaryTs);
+        governor.batchAttestVotes(proposalId, votes);
+
+        (, uint forVotes,) = governor.getTally(proposalId);
+    
+        require(forVotes == 34000e18);  
+    }
+
+    function restRevoke() public {
+        /* ------PRIMARY-DELEGATOR------- */
+        vm.startPrank(DELEGATOR_PRIMARY);
+        uint primaryTs = block.timestamp + 7 days;
+        governor.delegate(DELEGATEE_PRIMARY, primaryTs);
+        vm.stopPrank();
+        /* -------------------------------- */ 
+
+        /* ------SECONDARY-DELEGATOR------- */
+        vm.startPrank(DELEGATOR_SECONDARY);
+        uint secondaryTs = block.timestamp + 1 days;
+        governor.delegate(DELEGATEE_SECONDARY, secondaryTs);
+        vm.stopPrank();
+        /* -------------------------------- */ 
+
+        /* ------PRIMARY-DELEGATEE------- */
+        vm.startPrank(DELEGATEE_PRIMARY);
+        uint proposalId = pushMockProposal();
+
+        vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
+
+        governor.castVote(proposalId, 1, "");
+        governor.castVirtualVote(proposalId, 1, DELEGATOR_PRIMARY);
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        /* ------PRIMARY-DELEGATOR------- */
+        vm.startPrank(DELEGATOR_PRIMARY);
+        governor.revoke();
+        vm.stopPrank();
+        /* -------------------------------- */ 
+
+        /* ------SECONDARY-DELEGATOR------- */
+        vm.startPrank(DELEGATOR_SECONDARY);
+        // Cant revoke an already expired delegation
+        vm.expectRevert();
+        governor.revoke();
+        //////////////////////////////////////
+        vm.stopPrank();
+        /* -------------------------------- */ 
+
+        /* ------SECONDARY-DELEGATEE------- */
+        vm.startPrank(DELEGATEE_SECONDARY);
+        governor.castVote(proposalId, 1, "");
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD + 1);
+
+        governor.queue(proposalId);
+
+        vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + 1);
+
+        bytes[] memory votes = new bytes[](1);
+        votes[0] = abi.encode(DELEGATOR_PRIMARY, DELEGATEE_PRIMARY, primaryTs);
+        // Try attest revoked delegation
+        vm.expectRevert();
+        governor.batchAttestVotes(proposalId, votes);
+        //////////////////////////////////////
+
+        (, uint forVotes,) = governor.getTally(proposalId);
+    
+        require(forVotes == 17000e18);
+    }
 
     function setUpScenario() internal {
         /* ------PRIMARY-DELEGATOR------- */
@@ -216,7 +338,6 @@ contract VirtualGovernorTest is BaseGovernorTest {
         approveAndLock(STAKEHOLDER_MINOR);
         vm.stopPrank();
         /* -------------------------------- */ 
-
     }
 
 }
