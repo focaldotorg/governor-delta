@@ -69,7 +69,7 @@ contract BaseGovernorTest is Test {
     function testLockSystem() public {
         uint beforeTs = block.timestamp;
         uint balanceBefore = governorToken.balanceOf(STAKEHOLDER_PRIMARY);
-        (uint stakeBefore,) = governor.stake(STAKEHOLDER_PRIMARY);
+        (uint stakeBefore,,) = governor.stake(STAKEHOLDER_PRIMARY);
         require(balanceBefore == STAKEHOLDER_MAJOR);
         require(stakeBefore == 0);
 
@@ -83,7 +83,7 @@ contract BaseGovernorTest is Test {
         vm.warp(beforeTs + 6 hours);
 
         uint balanceAfter = governorToken.balanceOf(STAKEHOLDER_PRIMARY);
-        (uint stakeAfter, uint deltaTime) = governor.stake(STAKEHOLDER_PRIMARY);
+        (uint stakeAfter, uint deltaTime,) = governor.stake(STAKEHOLDER_PRIMARY);
 
         require(balanceAfter == 0);
         require(stakeAfter == STAKEHOLDER_MAJOR);
@@ -96,7 +96,7 @@ contract BaseGovernorTest is Test {
         /* -------------------------------- */
 
         uint balanceLast = governorToken.balanceOf(STAKEHOLDER_PRIMARY);
-        (uint stakeLast, uint deltaTimeLast) = governor.stake(STAKEHOLDER_PRIMARY);
+        (uint stakeLast, uint deltaTimeLast,) = governor.stake(STAKEHOLDER_PRIMARY);
 
         require(balanceLast == 500e18);
         require(stakeLast == 14500e18);
@@ -221,7 +221,7 @@ contract BaseGovernorTest is Test {
         vm.stopPrank();
         /* -------------------------------- */
 
-        vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
+        vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + 1);
 
         /* ------SECONDARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_SECONDARY);
