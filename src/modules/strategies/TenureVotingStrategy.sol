@@ -47,10 +47,7 @@ contract TenureVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrategy {
       * @dev When effectie time reaches a tranche boundry, the multiplier is applied
     **/
     function power(address owner) external view returns (uint) {
-        (uint balance, uint deltaAmountTime) = governor.stake(owner);
-        uint effectiveTime = deltaAmountTime / balance;
-        Tranche memory tranche = getTranche(effectiveTime);
-        return balance * tranche.multiplier / MULTIPLIER_UNIT; 
+        return predict(owner, block.timestamp); 
     }
 
     /**
@@ -59,14 +56,15 @@ contract TenureVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrategy {
       * @param timestamp The future time to query the voting power at
       * @return The future voting power of the account 
       * @dev Uses capital time integral to compute averaged time weight (effective time)
-      * @dev Projects future effective time by adding difference from future date-time
+      * @dev Projects future effective time through addition of future time delta
     **/
-    function predict(address owner, uint timestamp) external view returns (uint) {
+    function predict(address owner, uint timestamp) public view returns (uint) {
         if (timestamp < block.timestamp) return 0;
 
-        (uint balance, uint deltaAmountTime) = governor.stake(owner);
+        (uint balance, uint deltaAmountTime, uint lastUpdateTime) = governor.stake(owner);
         uint effectiveTime = deltaAmountTime / balance;
-        uint futureTime = effectiveTime + (timestamp - block.timestamp);
+        uint deltaTime = timestamp - lastUpdateTime;
+        uint futureTime = effectiveTime + deltaTime;
         Tranche memory tranche = getTranche(futureTime);
         return balance * tranche.multiplier / MULTIPLIER_UNIT; 
     }
@@ -77,7 +75,7 @@ contract TenureVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrategy {
       * @return The voting weight of the account 
     **/
     function weight(address owner) external view returns (uint) {
-        (uint balance,) = governor.stake(owner);
+        (uint balance,,) = governor.stake(owner);
         return balance;
     }
 
