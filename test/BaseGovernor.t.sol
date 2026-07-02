@@ -100,7 +100,7 @@ contract BaseGovernorTest is Test {
 
         require(balanceLast == 500e18);
         require(stakeLast == 14500e18);
-        require(deltaTimeLast == (block.timestamp - beforeTs) * STAKEHOLDER_MAJOR);
+        require(deltaTimeLast == (block.timestamp - beforeTs) * 14500e18);
     }
 
     function testInvalidProposal() public {
