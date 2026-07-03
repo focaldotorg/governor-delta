@@ -627,7 +627,7 @@ contract GovernorDelta is GovernorStorageV3 {
         Tally storage tally = !veto ? proposal.results : proposal.veto;
         Ballot storage ballot = tally.primary; 
         uint resolveTs = veto ? proposal.eta : proposal.endTime;
-        uint votes = veto ? stake.amount : predictedPower(voter, proposal.endTime);
+        uint votes = veto ? stake.amount : predictedPower(voter, resolveTs);
         stake.unlockTime = resolveTs;
  
         return _recordVote(voter, support, ballot, votes, stake.amount);
@@ -824,7 +824,7 @@ contract GovernorDelta is GovernorStorageV3 {
 
     function _moveDelegates(address delegator, address delegatee, uint256 expiry) internal {
         if (delegator != delegatee) {
-          delegations[delegator] = Delegate({ target: delegatee, expiry: expiry });
+          delegations[delegator] = Delegate(delegatee, expiry);
         } else {
           delete delegations[delegator];
           stakes[delegator].unlockTime = block.timestamp;
