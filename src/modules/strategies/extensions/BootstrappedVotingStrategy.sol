@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.10;
 
-abstract contract BootstrappedVotingStrategy {
+import "@interfaces/IBootstrappedVotingStrategy.sol";
+
+abstract contract BootstrappedVotingStrategy is IBootstrappedVotingStrategy {
 
     /// @notice Tenure mapping for accounts, acting as a basis 
     mapping(address => uint) public seeds;
