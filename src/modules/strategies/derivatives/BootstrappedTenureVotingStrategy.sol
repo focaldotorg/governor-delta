@@ -8,7 +8,7 @@ contract BootstrappedTenureVotingStrategy is TenureVotingStrategy, BootstrappedV
 
     constructor(address governor_, Tranche[] memory tranches_, Seed[] memory seeds_) 
         TenureVotingStrategy(governor_, tranches_) 
-    {
+    public {
         for (uint i = 0; i < seeds_.length; i++) {
             address seedAccount = seeds_[i].account;
             uint seedValue = seeds_[i].effectiveTime;
@@ -17,7 +17,9 @@ contract BootstrappedTenureVotingStrategy is TenureVotingStrategy, BootstrappedV
         }
     }
 
-    function predict(address owner, uint timestamp) public view returns (uint) {
+    function predict(address owner, uint timestamp)   
+        override(TenureVotingStrategy, BootstrappedVotingStrategy) 
+    public view returns (uint) {
         if (timestamp < block.timestamp) return 0;
 
         (uint balance, uint deltaAmountTime, uint lastUpdateTime) = governor.stake(owner);

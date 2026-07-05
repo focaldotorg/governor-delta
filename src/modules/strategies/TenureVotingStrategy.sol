@@ -58,7 +58,7 @@ contract TenureVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrategy {
       * @dev Uses capital time integral to compute averaged time weight (effective time)
       * @dev Projects future effective time through addition of future time delta
     **/
-    function predict(address owner, uint timestamp) public view returns (uint) {
+    function predict(address owner, uint timestamp) public virtual view returns (uint) {
         if (timestamp < block.timestamp) return 0;
 
         (uint balance, uint deltaAmountTime, uint lastUpdateTime) = governor.stake(owner);
