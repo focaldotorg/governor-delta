@@ -213,10 +213,10 @@ contract GovernorStorageV3 is IGovernor, GovernorStorageV2 {
 
     /// @notice Delegation parameters
     struct Delegate {
-        /// @notice The timestamp when the delegation is deemed as invalid
-        uint expiry;
         /// @notice The stakeholder address to assign voting power
         address target;
+        /// @notice The timestamp when the delegation is deemed as invalid
+        uint expiry;
     }
 
     /// @notice Proposal metadata and parameters

@@ -122,7 +122,7 @@ contract CanonicalGovernorTest is BaseGovernorTest {
         /* ------PRIMARY-DELEGATOR------- */
         vm.startPrank(DELEGATOR_PRIMARY);
         // Delegator can redelegate because of expiry
-        governor.redelegate(DELEGATEE_SECONDARY, block.timestamp + 1 days);
+        governor.delegate(DELEGATEE_SECONDARY, block.timestamp + 1 days);
         vm.stopPrank();
         /* -------------------------------- */ 
 

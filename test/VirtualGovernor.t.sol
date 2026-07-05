@@ -174,14 +174,14 @@ contract VirtualGovernorTest is BaseGovernorTest {
         vm.startPrank(DELEGATOR_PRIMARY);
         // Cant redelegate an active delegation without revoking
         vm.expectRevert();
-        governor.redelegate(DELEGATOR_PRIMARY, block.timestamp + 7 days);
+        governor.delegate(DELEGATEE_PRIMARY, block.timestamp + 7 days);
         //////////////////////////////////////
         vm.stopPrank();
         /* -------------------------------- */ 
 
         /* ------SECONDARY-DELEGATOR------- */
         vm.startPrank(DELEGATOR_SECONDARY);
-        governor.redelegate(DELEGATOR_SECONDARY, block.timestamp + 7 days);
+        governor.delegate(DELEGATOR_SECONDARY, block.timestamp + 7 days);
         governor.castVote(proposalId, 1, "");
         vm.stopPrank();
         /* -------------------------------- */ 
@@ -207,7 +207,7 @@ contract VirtualGovernorTest is BaseGovernorTest {
         require(forVotes == 34000e18);  
     }
 
-    function restRevoke() public {
+    function testRevoke() public {
         /* ------PRIMARY-DELEGATOR------- */
         vm.startPrank(DELEGATOR_PRIMARY);
         uint primaryTs = block.timestamp + 7 days;

@@ -430,31 +430,14 @@ contract GovernorDelta is GovernorStorageV3 {
     **/
     function delegate(address delegatee, uint expiry) external returns (bytes memory id) {
         Stake storage s = stakes[msg.sender];
+        Delegate storage d = delegations[msg.sender];
+        require(s.amount > 0, "GovernorDelta::delegate: no stake");
         require(delegationActive, "GovernorDelta::delegate: delegation not active");
         require(delegatee != address(0), "GovernorDelta::delegate: invalid delegatee");
         require(expiry > block.timestamp, "GovernorDelta::delegate: insufficient expiry");
         require(expiry - block.timestamp <= MAX_DELEGATION_PERIOD, "GovernorDelta::delegate: invalid expiry");
-        require(delegations[msg.sender].target == address(0), "GovernorDelta::delegate: active delegation");
+        require(d.expiry < block.timestamp, "GovernorDelta::delegate: active delegation");
         require(s.unlockTime < block.timestamp, "GovernorDelta::delegate: vote already assigned");
-        require(s.amount > 0, "GovernorDelta::delegate: no stake");
-        id = abi.encode(msg.sender, delegatee, expiry);
-
-        _moveDelegates(msg.sender, delegatee, expiry);
-        emit Delegation(msg.sender, delegatee, expiry, keccak256(id));
-    }
-
-    /**
-      * @notice Redelegates voting power after an expired delegation
-      * @param delegatee The address to delegate voting power to, pass msg.sender to reclaim
-      * @param expiry The timestamp at which the delegation expires
-      * @return id The new delegation identifier
-    **/
-    function redelegate(address delegatee, uint expiry) external returns (bytes memory id) {
-        require(delegationActive, "GovernorDelta::redelegate: delegation not active");
-        require(delegatee != address(0), "GovernorDelta::redelegate: invalid delegatee");
-        require(expiry > block.timestamp, "GovernorDelta::delegate: insufficient expiry");
-        require(expiry - block.timestamp <= MAX_DELEGATION_PERIOD, "GovernorDelta::delegate: invalid expiry");
-        require(delegations[msg.sender].expiry <= block.timestamp, "GovernorDelta::redelegate: active delegation");
         id = abi.encode(msg.sender, delegatee, expiry);
 
         _moveDelegates(msg.sender, delegatee, expiry);
