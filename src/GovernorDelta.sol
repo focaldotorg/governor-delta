@@ -452,7 +452,6 @@ contract GovernorDelta is GovernorStorageV3 {
     function revoke() external returns (bytes memory id) {
         Delegate storage d = delegations[msg.sender];
         require(delegationActive, "GovernorDelta::revoke: delegation not active");
-        require(d.target != address(0), "GovernorDelta::revoke: no delegation to revoke");
         require(d.expiry > block.timestamp, "GovernorDelta::revoke: delegation already expired");
 
         if (!votingModule.virtualized()) {
@@ -587,8 +586,11 @@ contract GovernorDelta is GovernorStorageV3 {
             (address delegator, address delegatee, uint256 expiry) = abi.decode(delegateIds[i], (address, address, uint));
             ProposalV2 storage proposal = proposals[proposalId];
             Record storage record = proposal.results.virtualized.records[delegator];
+            Record storage receipt = proposal.results.primary.records[delegator];
             require(record.hasVoted, "GovernorDelta::batchAttestVotes: delegation unspent");
+            require(!receipt.hasVoted, "GovernorDelta::batchAttestVotes: delegation already attested");
             proposal.results.primary.totalWeight += record.weight;
+            receipt.hasVoted = true;
 
             if (record.support == 0) proposal.results.primary.againstVotes += record.votes;
             else if (record.support == 1) proposal.results.primary.forVotes += record.votes;

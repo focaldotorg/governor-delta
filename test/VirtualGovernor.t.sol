@@ -137,7 +137,10 @@ contract VirtualGovernorTest is BaseGovernorTest {
         //////////////////////////////////////
         votes[0] = abi.encode(DELEGATOR_PRIMARY, DELEGATEE_PRIMARY, primaryTs);
         governor.batchAttestVotes(proposalId, votes);
-  
+        // Attempt reattesting 
+        vm.expectRevert();
+        governor.batchAttestVotes(proposalId, votes);
+        //////////////////////////////////////
         (uint againstVotes, uint forVotes,) = governor.getTally(proposalId);
     
         require(forVotes == 28500e18);
