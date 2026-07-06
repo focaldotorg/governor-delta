@@ -452,6 +452,7 @@ contract GovernorDelta is GovernorStorageV3 {
     function revoke() external returns (bytes memory id) {
         Delegate storage d = delegations[msg.sender];
         require(delegationActive, "GovernorDelta::revoke: delegation not active");
+        require(d.target != address(0), "GovernorDelta::revoke: no delegation to revoke");
         require(d.expiry > block.timestamp, "GovernorDelta::revoke: delegation already expired");
 
         if (!votingModule.virtualized()) {
