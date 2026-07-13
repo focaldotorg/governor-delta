@@ -5,8 +5,10 @@ import "@interfaces/IBootstrappedVotingStrategy.sol";
 
 abstract contract BootstrappedVotingStrategy is IBootstrappedVotingStrategy {
 
+    uint constant public MAX_SEED_TIME = 365 days;
+
     /// @notice Tenure mapping for accounts, acting as a basis 
-    mapping(address => uint) public seeds;
+    mapping(address => Seed) public seeds;
 
     /**
       * @notice Get seeded effective time for an account  
@@ -14,7 +16,8 @@ abstract contract BootstrappedVotingStrategy is IBootstrappedVotingStrategy {
       * @return Baseline effective time 
     **/
     function seededEffectiveTime(address owner) public view returns (uint) {
-        return seeds[owner];
+        Seed storage seed = seeds[owner];
+        return seed.lifeTime > block.timestamp ? seed.basisTime : 0;
     }
 
     /**
