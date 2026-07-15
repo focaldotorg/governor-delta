@@ -31,25 +31,35 @@ The definitive and immutable currency of authority, defined at deployment. It re
 **Guards**  
 Organisations inherit `StakedTransferGuard` by default for relay proposals. This guard prevents stakeholder deposits from being transferred when a proposal is processed and is a default immutable policy, that is not recommended to omit.
 
-## Effective Time
+# Effective Time
 
 A capital-time integral, known as "effective time" (et. Gosling 2026), provides a single metric to effectively balance capital contribution with time. The parameter `deltaAmountTime` is designed to reflect that integral, recording a commitment profile across age and deposit size rather than a single snapshot:
 
-$$
-\text{effective\_time} = \int amount(t) \, dt
-$$
+&nbsp;
+```math
+t_{\mathrm{effective}} = \int \mathrm{amount}(t)\,dt
+```
+&nbsp;
 
 Since $amount(t)$ only changes at discrete `lock`/`unlock` events, the integral is computed incrementally as a running sum rather than continuously, every event settles the interval since the last update using the *balance held over that interval*:
 
-$$
-\Delta_{amountTime} \mathrel{+}= amount \cdot (now - lastUpdateTime)
-$$
+&nbsp;
+```math
+\Delta t_{\mathrm{effective}}
+\mathrel{+}= \mathrm{amount} \cdot (\mathrm{now} - \mathrm{lastUpdateTime})
+```
+&nbsp;
 
-Over $n$ update events between $t_0$ and now, this is equivalent to:
+Over \(n\) update events between \(t_0\) and the current time, this is equivalent to:
 
-$$
-\text{effective\_time} = \sum_{i=0}^{n} amount_i \cdot (t_{i+1} - t_i)
-$$
+&nbsp;
+```math
+t_{\mathrm{effective}}
+=
+\sum_{i=0}^{n-1}
+\mathrm{amount}_i \cdot (t_{i+1} - t_i)
+```
+&nbsp;
 
 In more formal mathematical terms this can be viewed as a Riemann sum of held balance × time-held, accumulated piecewise at each `lock` or `unlock` call rather than requiring a historical checkpoint lookup. The replacement for Bravo's prior checkpoint system with the benefit of now recording tenure, that can leveraged directly in design of voting modules instead of querying balances at a given discrete time.
 
@@ -61,9 +71,11 @@ Settles effective time up to now against the *prior* balance, then applies the n
 
 Settles effective time up to now, then rescales it proportionally to the capital retained:
 
-$$
-\Delta_{amountTime} \mathrel{*}= \frac{amount - withdrawn}{amount}
-$$
+&nbsp;
+```math
+\Delta t_{\mathrm{effective}} \mathrel{*}= \frac{amount - withdrawn}{amount}
+```
+&nbsp;
 
 When unlocking remainder balances retain their time-weight to not penalise deductions to preserve stakeholder conviction. 
 
@@ -115,7 +127,7 @@ Delegation by default is disabled, and can be activated for any deployment throu
 
 #### Identifiers
 
-Every delegation action produces a `keccak256(delegator, delgatee, amount, expiry)` bytehash for used for referenced in validation of coalitions post proposal voting period and create provenance for delegation actions.
+Every delegation action produces a `abi.encode(delegator, delgatee, expiry)` bytehash for used for referenced in validation of coalitions post proposal voting period and create provenance for delegation actions.
 
 #### Management
 
