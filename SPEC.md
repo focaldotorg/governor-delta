@@ -3,17 +3,17 @@
 ## Omissions
 
 ### Whitelisting 
-Replaced by the more broad [Timelock](#timelock) restructuring and possible to implement with the new [Guard System](#guards), it still was an unfavorable design choice of Bravo for more distributed organisations.
+Replaced by the more broad [Timelock](#timelock) restructuring and possible to implement with the new [Guard System](#guards). 
 
 ### Configuration Immutability
-Bravo predefined all parameters of governance at deployment time, which fundamentally fails to adapt for changing asset supply and stakeholder demographics. An organisation is never the same as it was last week, a rigid structure not only subjects deployments of Bravo to rigorous thresholds (quotas) and quorums to contest adverserial capture but also erodes participation from barriers to entry. Failure to adequcately calculate sufficient values, additionally leaves an organisation vulnerable to attack with little means for recourse.
+Bravo predefined all parameters of governance at deployment time, which fundamentally fails to adapt for changing asset supply and stakeholder demographics. An organisation is never the same as it was last week, a rigid structure not only subjects deployments of Bravo to rigorous thresholds (quotas) and quorums to contest rogue capture but also erodes participation from barriers to entry. Failure to adequately calculate sufficient values, additionally leaves an organisation vulnerable to attack with little means for recourse.
 
 ### Checkpoints
-Now redacted in Bravo from to the requirement of attesting balances, where stakeholders lock tokens to the contract to signal conviction regressing the need for historic lookups with a checkpoint system. Which while was designed to combat vote-buying, unironically creates the new issue of proposers excercising voting power they may not still retain. As an adversary can create a malicous proposal, vote and then continue to offload the equivalent tokens from the cast voting power on secondary markets, yet still have their weight meaningfully excercised in the [Ballot](#ballots). A problem that would be only be exacerbated if a group of actors colluded together.
+Now redacted in Bravo from the replacement of locking and commiting balances, where stakeholders lock tokens to the contract to signal conviction regressing the need for historic lookups with a checkpoint system. Which while was designed to combat vote-buying, unironically creates the new issue of proposers exercising voting power they may not still retain. As an adversary can create a malicious proposal, vote and then continue to capitulate the equivalent balance on secondary markets, yet still have their weight meaningfully recorded in the [Ballot](#ballots). A problem that would be only be exacerbated if a group of actors colluded together, Delta is not subject to flaw as proposal require attesting balances until resolution.
 
 ### Monotonic Call Authority 
 
-In Bravo the timelock faced an issue of the prior call structure, that caused native account balance stored in the timelock to be unspendable, this is addressed by the introduction of [Relay Proposals](#relay-proposals).
+In Bravo the timelock faced an issue in its prior proposal call structure, that caused native account balance stored in the timelock to become unspendable, this is addressed by the introduction of [Relay Proposals](#relay-proposals).
 
 ## Configuration
 
@@ -30,6 +30,42 @@ The definitive and immutable currency of authority, defined at deployment. It re
 
 **Guards**  
 Organisations inherit `StakedTransferGuard` by default for relay proposals. This guard prevents stakeholder deposits from being transferred when a proposal is processed and is a default immutable policy, that is not recommended to omit.
+
+## Effective Time
+
+A capital-time integral, known as "effective time" (et. Gosling 2026), provides a single metric to effectively balance capital contribution with time. The parameter `deltaAmountTime` is designed to reflect that integral, recording a commitment profile across age and deposit size rather than a single snapshot:
+
+$$
+\text{effective\_time} = \int amount(t) \, dt
+$$
+
+Since $amount(t)$ only changes at discrete `lock`/`unlock` events, the integral is computed incrementally as a running sum rather than continuously, every event settles the interval since the last update using the *balance held over that interval*:
+
+$$
+\Delta_{amountTime} \mathrel{+}= amount \cdot (now - lastUpdateTime)
+$$
+
+Over $n$ update events between $t_0$ and now, this is equivalent to:
+
+$$
+\text{effective\_time} = \sum_{i=0}^{n} amount_i \cdot (t_{i+1} - t_i)
+$$
+
+In more formal mathematical terms this can be viewed as a Riemann sum of held balance × time-held, accumulated piecewise at each `lock` or `unlock` call rather than requiring a historical checkpoint lookup. The replacement for Bravo's prior checkpoint system with the benefit of now recording tenure, that can leveraged directly in design of voting modules instead of querying balances at a given discrete time.
+
+### Locking
+
+Settles effective time up to now against the *prior* balance, then applies the new deposit, new depoists do not retroactively accrue effective time for periods before it existed, it actually dilutes it.
+
+### Unlocking
+
+Settles effective time up to now, then rescales it proportionally to the capital retained:
+
+$$
+\Delta_{amountTime} \mathrel{*}= \frac{amount - withdrawn}{amount}
+$$
+
+When unlocking remainder balances retain their time-weight to not penalise deductions to preserve stakeholder conviction. 
 
 ## Modules
 
@@ -79,7 +115,7 @@ Delegation by default is disabled, and can be activated for any deployment throu
 
 #### Identifiers
 
-Every delegation action produces a `keccak256(delegator, nonce, delgatee, amount, expiry)` bytehash for used for referenced in validation of coalitions post proposal voting period and create provenance for delegation actions.
+Every delegation action produces a `keccak256(delegator, delgatee, amount, expiry)` bytehash for used for referenced in validation of coalitions post proposal voting period and create provenance for delegation actions.
 
 #### Management
 
@@ -89,8 +125,7 @@ All delegations are subject to the `MAX_DELEGATION_PERIOD` constraint, this is n
 
 ##### Revocability
 
-In the case of virtualised voting modules, revoacability is available at any time - even admist a proposal where that delegated power has already been cast - this is to factor for the potential inclusion of delegation leasing and enforcing such arrangements on a continous bilateral price model. **If you do not wish to be exposed to delegation market risk, do not activate delegation**. When dealing with no virtualised strategies, you can only revoke an active delegation when it is not cast to an active proposal and it is not expired.
-
+In the case of virtualised voting modules, the ability to cancel delegation is available at any time - even admist a proposal where that delegated power has already been cast - this is to factor for the potential inclusion of delegation leasing and enforcing such arrangements on a continuous bilateral pricing model. **If you do not wish to be exposed to delegation market risk, do not activate delegation**. When dealing with no virtualised strategies, you can only revoke an active delegation when it is not cast to an active proposal and is not expired.  
 
 ## Proposal System
 
@@ -136,13 +171,13 @@ Veto voting period is only active as long as the timelock it does not extend the
 
 This is the default delay required until the proposal can be queued if it is succeeded.
 
-### Veto Period
-
-The is the period of which a proposal is pending for execution, and where it can be contested to trigger a veto action, the voting period for the veto proposal only lasts as long as the veto period.
-
 ### Grace Period
 
 The maximum time a proposal is deemed as valid for execution.
+
+### Veto Period
+
+The is the period of which a proposal is pending for execution, and where it can be contested to trigger a veto action, the voting period for the veto proposal only lasts as long as the veto period.
 
 ### Vote Attestation
 
