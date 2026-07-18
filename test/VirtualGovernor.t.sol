@@ -296,7 +296,7 @@ contract VirtualGovernorTest is BaseGovernorTest {
         governor.castVirtualVote(proposalId, 1, delegator);
         vm.stopPrank();
 
-        bytes32 digest = governor.revocationDigest(DELEGATEE_PRIMARY, delegationExpiry, 0, sigExpiry);
+        bytes32 digest = revocationDigest(DELEGATEE_PRIMARY, delegationExpiry, 0, sigExpiry);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(delegatorPk, digest);
         governor.revokeBySig(DELEGATEE_PRIMARY, delegationExpiry, 0, sigExpiry, v, r, s);
 
