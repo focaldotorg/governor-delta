@@ -554,18 +554,4 @@ contract BaseGovernorTest is Test {
         return governor.propose(0, targets, values, signatures, calldatas, "");
     }
 
-    function governorDomainSeparator() internal view returns (bytes32) {
-        return keccak256(abi.encode(governor.DOMAIN_TYPEHASH(), keccak256(bytes(governor.name())), block.chainid, address(governor)));
-    }
-
-    function delegationDigest(address delegatee, uint expiry, uint nonce, uint sigExpiry) internal view returns (bytes32) {
-        bytes32 structHash = keccak256(abi.encode(governor.DELEGATION_TYPEHASH(), delegatee, expiry, nonce, sigExpiry));
-        return keccak256(abi.encodePacked("\x19\x01", governorDomainSeparator(), structHash));
-    }
-
-    function revocationDigest(address delegatee, uint expiry, uint nonce, uint sigExpiry) internal view returns (bytes32) {
-        bytes32 structHash = keccak256(abi.encode(governor.REVOCATION_TYPEHASH(), delegatee, expiry, nonce, sigExpiry));
-        return keccak256(abi.encodePacked("\x19\x01", governorDomainSeparator(), structHash));
-    }
-
 }

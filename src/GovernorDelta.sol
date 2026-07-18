@@ -72,6 +72,23 @@ contract GovernorDelta is GovernorStorageV3 {
     /// @notice The EIP-712 typehash for the contract's domain
     bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
 
+    /// @notice Returns the EIP-712 domain separator for Governor Delta signatures
+    function governorDomainSeparator() public view returns (bytes32) {
+        return keccak256(abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name)), _getChainId(), address(this)));
+    }
+
+    /// @notice Returns the EIP-712 digest for a delegation signature
+    function delegationDigest(address delegatee, uint expiry, uint nonce, uint sigExpiry) public view returns (bytes32) {
+        bytes32 structHash = keccak256(abi.encode(DELEGATION_TYPEHASH, delegatee, expiry, nonce, sigExpiry));
+        return keccak256(abi.encodePacked("\x19\x01", governorDomainSeparator(), structHash));
+    }
+
+    /// @notice Returns the EIP-712 digest for a revocation signature
+    function revocationDigest(address delegatee, uint expiry, uint nonce, uint sigExpiry) public view returns (bytes32) {
+        bytes32 structHash = keccak256(abi.encode(REVOCATION_TYPEHASH, delegatee, expiry, nonce, sigExpiry));
+        return keccak256(abi.encodePacked("\x19\x01", governorDomainSeparator(), structHash));
+    }
+
     /**
       * @notice Used to initialize the contract during delegator constructor
       * @param timelock_ The address of the Timelock
@@ -450,9 +467,7 @@ contract GovernorDelta is GovernorStorageV3 {
       * @return id The delegation identifier
     **/
     function delegateBySig(address delegatee, uint expiry, uint nonce, uint sigExpiry, uint8 v, bytes32 r, bytes32 s) external returns (bytes memory id) {
-        bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name)), _getChainId(), address(this)));
-        bytes32 structHash = keccak256(abi.encode(DELEGATION_TYPEHASH, delegatee, expiry, nonce, sigExpiry));
-        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
+        bytes32 digest = delegationDigest(delegatee, expiry, nonce, sigExpiry);
         address signatory = ecrecover(digest, v, r, s);
         require(signatory != address(0), "GovernorDelta::delegateBySig: invalid signature");
         require(nonce == nonces[signatory]++, "GovernorDelta::delegateBySig: invalid nonce");
@@ -483,9 +498,7 @@ contract GovernorDelta is GovernorStorageV3 {
       * @return id The revoked delegation identifier
     **/
     function revokeBySig(address delegatee, uint expiry, uint nonce, uint sigExpiry, uint8 v, bytes32 r, bytes32 s) external returns (bytes memory id) {
-        bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name)), _getChainId(), address(this)));
-        bytes32 structHash = keccak256(abi.encode(REVOCATION_TYPEHASH, delegatee, expiry, nonce, sigExpiry));
-        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
+        bytes32 digest = revocationDigest(delegatee, expiry, nonce, sigExpiry);
         address signatory = ecrecover(digest, v, r, s);
         require(signatory != address(0), "GovernorDelta::revokeBySig: invalid signature");
         require(nonce == nonces[signatory]++, "GovernorDelta::revokeBySig: invalid nonce");
@@ -846,15 +859,15 @@ contract GovernorDelta is GovernorStorageV3 {
     }
 
     function _delegate(address delegator, address delegatee, uint expiry) internal returns (bytes memory id) {
-        Stake storage stake_ = stakes[delegator];
+        Stake storage s = stakes[delegator];
         Delegate storage delegation = delegations[delegator];
-        require(stake_.amount > 0, "GovernorDelta::delegate: no stake");
+        require(s.amount > 0, "GovernorDelta::delegate: no stake");
         require(delegationActive, "GovernorDelta::delegate: delegation not active");
         require(delegatee != address(0), "GovernorDelta::delegate: invalid delegatee");
         require(expiry > block.timestamp, "GovernorDelta::delegate: insufficient expiry");
         require(expiry - block.timestamp <= MAX_DELEGATION_PERIOD, "GovernorDelta::delegate: invalid expiry");
         require(delegation.expiry < block.timestamp, "GovernorDelta::delegate: active delegation");
-        require(stake_.unlockTime < block.timestamp, "GovernorDelta::delegate: vote already assigned");
+        require(s.unlockTime < block.timestamp, "GovernorDelta::delegate: vote already assigned");
         id = abi.encode(delegator, delegatee, expiry);
 
         _moveDelegates(delegator, delegatee, expiry);
@@ -865,10 +878,10 @@ contract GovernorDelta is GovernorStorageV3 {
         Delegate storage delegation = delegations[delegator];
         require(delegationActive, "GovernorDelta::revoke: delegation not active");
         require(delegation.expiry > block.timestamp, "GovernorDelta::revoke: delegation already expired");
-        require(delegation.target == delegatee && delegation.expiry == expiry, "GovernorDelta::revokeBySig: delegation changed");
+        require(delegation.target == delegatee && delegation.expiry == expiry, "GovernorDelta::revoke: delegation changed");
 
         if (!votingModule.virtualized()) {
-            require(stakes[delegator].unlockTime < block.timestamp, "GovernorDelta::resolve: delegation lock");
+            require(stakes[delegator].unlockTime < block.timestamp, "GovernorDelta::revoke: delegation lock");
         }
 
         id = abi.encode(delegator, delegatee, expiry);

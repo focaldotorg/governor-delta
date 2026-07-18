@@ -198,7 +198,7 @@ contract CanonicalGovernorTest is BaseGovernorTest {
         vm.expectRevert();
         governor.delegateBySig(DELEGATEE_PRIMARY, delegationExpiry, 0, sigExpiry, 0, bytes32(0), bytes32(0));
 
-        bytes32 digest = delegationDigest(DELEGATEE_PRIMARY, delegationExpiry, 0, sigExpiry);
+        bytes32 digest = governor.delegationDigest(DELEGATEE_PRIMARY, delegationExpiry, 0, sigExpiry);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(delegatorPk, digest);
         bytes memory id = governor.delegateBySig(DELEGATEE_PRIMARY, delegationExpiry, 0, sigExpiry, v, r, s);
         (address target, uint expiry) = governor.delegations(delegator);
@@ -223,7 +223,7 @@ contract CanonicalGovernorTest is BaseGovernorTest {
         approveAndLock(STAKEHOLDER_MINOR);
         vm.stopPrank();
 
-        bytes32 digest = delegationDigest(DELEGATEE_PRIMARY, delegationExpiry, 0, sigExpiry);
+        bytes32 digest = governor.delegationDigest(DELEGATEE_PRIMARY, delegationExpiry, 0, sigExpiry);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(delegatorPk, digest);
 
         vm.prank(RELAYER);
@@ -246,7 +246,7 @@ contract CanonicalGovernorTest is BaseGovernorTest {
         approveAndLock(STAKEHOLDER_MINOR);
         vm.stopPrank();
 
-        bytes32 digest = delegationDigest(DELEGATEE_PRIMARY, delegationExpiry, 0, sigExpiry);
+        bytes32 digest = governor.delegationDigest(DELEGATEE_PRIMARY, delegationExpiry, 0, sigExpiry);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(delegatorPk, digest);
 
         vm.expectRevert();
@@ -268,7 +268,7 @@ contract CanonicalGovernorTest is BaseGovernorTest {
 
         vm.warp(block.timestamp + 1 days + 1);
 
-        bytes32 digest = delegationDigest(DELEGATEE_SECONDARY, nextExpiry, 0, sigExpiry);
+        bytes32 digest = governor.delegationDigest(DELEGATEE_SECONDARY, nextExpiry, 0, sigExpiry);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(delegatorPk, digest);
 
         governor.delegateBySig(DELEGATEE_SECONDARY, nextExpiry, 0, sigExpiry, v, r, s);
@@ -291,7 +291,7 @@ contract CanonicalGovernorTest is BaseGovernorTest {
         approveAndLock(STAKEHOLDER_MINOR);
         vm.stopPrank();
 
-        bytes32 digest = delegationDigest(DELEGATEE_PRIMARY, signatureDelegationExpiry, 0, sigExpiry);
+        bytes32 digest = governor.delegationDigest(DELEGATEE_PRIMARY, signatureDelegationExpiry, 0, sigExpiry);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(delegatorPk, digest);
 
         vm.prank(delegator);
@@ -314,7 +314,7 @@ contract CanonicalGovernorTest is BaseGovernorTest {
         governor.delegate(DELEGATEE_PRIMARY, initialExpiry);
         vm.stopPrank();
 
-        bytes32 digest = revocationDigest(DELEGATEE_PRIMARY, initialExpiry, 0, sigExpiry);
+        bytes32 digest = governor.revocationDigest(DELEGATEE_PRIMARY, initialExpiry, 0, sigExpiry);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(delegatorPk, digest);
 
         vm.warp(block.timestamp + 1 days + 1);
@@ -338,7 +338,7 @@ contract CanonicalGovernorTest is BaseGovernorTest {
         governor.delegate(DELEGATEE_PRIMARY, delegationExpiry);
         vm.stopPrank();
 
-        bytes32 digest = revocationDigest(DELEGATEE_PRIMARY, delegationExpiry, 0, sigExpiry);
+        bytes32 digest = governor.revocationDigest(DELEGATEE_PRIMARY, delegationExpiry, 0, sigExpiry);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(delegatorPk, digest);
 
         vm.warp(block.timestamp + 1 days + 1);
@@ -359,7 +359,7 @@ contract CanonicalGovernorTest is BaseGovernorTest {
         governor.delegate(DELEGATEE_PRIMARY, delegationExpiry);
         vm.stopPrank();
 
-        bytes32 digest = revocationDigest(DELEGATEE_PRIMARY, delegationExpiry, 0, sigExpiry);
+        bytes32 digest = governor.revocationDigest(DELEGATEE_PRIMARY, delegationExpiry, 0, sigExpiry);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(delegatorPk, digest);
 
         vm.prank(RELAYER);
@@ -395,7 +395,7 @@ contract CanonicalGovernorTest is BaseGovernorTest {
         governor.castVirtualVote(proposalId, 1, delegator);
         vm.stopPrank();
 
-        bytes32 digest = revocationDigest(DELEGATEE_PRIMARY, delegationExpiry, 0, sigExpiry);
+        bytes32 digest = governor.revocationDigest(DELEGATEE_PRIMARY, delegationExpiry, 0, sigExpiry);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(delegatorPk, digest);
 
         vm.expectRevert();
