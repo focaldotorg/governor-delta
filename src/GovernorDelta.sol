@@ -190,9 +190,9 @@ contract GovernorDelta is GovernorStorageV3 {
       * @param voter The address of the voter
       * @return The voting records 
     **/
-    function getRecords(uint proposalId, address voter) public view returns (Record[4] memory) {
+    function getRecords(uint proposalId, address voter) public view returns (Record[3] memory) {
         ProposalV2 storage p = proposals[proposalId];
-        return [p.primary.records[voter], p.virtualized.records[voter], p.veto.records[voter], p.veto.records[voter]]; 
+        return [p.primary.records[voter], p.virtualized.records[voter], p.veto.records[voter]]; 
     }
 
     /**
@@ -429,6 +429,19 @@ contract GovernorDelta is GovernorStorageV3 {
     }
 
     /**
+      * @notice Cast a vote for a proposal
+      * @param proposalId The id of the proposal to vote on
+      * @param support The support value for the vote. 0=against, 1=for, 2=abstain
+      * @param reason The reason given for the vote by the voter
+    **/
+    function castVote(uint proposalId, uint8 support, string calldata reason) public {
+        require(state(proposalId) == ProposalState.Active, "GovernorDelta::castVote: voting is closed");
+        uint votes = _logVote(msg.sender, proposalId, support, false);
+
+        emit VoteCast(msg.sender, proposalId, support, votes, reason);
+    }
+
+    /**
       * @notice Delegates voting power to another account
       * @param delegatee The address to delegate voting power to
       * @param expiry The timestamp at which the delegation expires
@@ -446,19 +459,6 @@ contract GovernorDelta is GovernorStorageV3 {
     function revoke() external returns (bytes memory id) {
         Delegate storage d = delegations[msg.sender];
         return _revoke(msg.sender, d.target, d.expiry);
-    }
-
-    /**
-      * @notice Cast a vote for a proposal
-      * @param proposalId The id of the proposal to vote on
-      * @param support The support value for the vote. 0=against, 1=for, 2=abstain
-      * @param reason The reason given for the vote by the voter
-    **/
-    function castVote(uint proposalId, uint8 support, string calldata reason) public {
-        require(state(proposalId) == ProposalState.Active, "GovernorDelta::castVote: voting is closed");
-        uint votes = _logVote(msg.sender, proposalId, support, false);
-
-        emit VoteCast(msg.sender, proposalId, support, votes, reason);
     }
 
     /**
@@ -549,7 +549,7 @@ contract GovernorDelta is GovernorStorageV3 {
         require(signatory != address(0), "GovernorDelta::delegateBySig: invalid signature");
         uint currentNonce = nonces[signatory];
         require(nonce == currentNonce, "GovernorDelta::delegateBySig: invalid nonce");
-        require(block.timestamp <= sigExpiry, "GovernorDelta::delegateBySig: signature expired");
+        require(block.timestamp < sigExpiry, "GovernorDelta::delegateBySig: signature expired");
         nonces[signatory] = currentNonce + 1;
 
         return _delegate(signatory, delegatee, expiry);
@@ -574,7 +574,7 @@ contract GovernorDelta is GovernorStorageV3 {
         require(signatory != address(0), "GovernorDelta::revokeBySig: invalid signature");
         uint currentNonce = nonces[signatory];
         require(nonce == currentNonce, "GovernorDelta::revokeBySig: invalid nonce");
-        require(block.timestamp <= sigExpiry, "GovernorDelta::revokeBySig: signature expired");
+        require(block.timestamp < sigExpiry, "GovernorDelta::revokeBySig: signature expired");
         nonces[signatory] = currentNonce + 1;
 
         return _revoke(signatory, delegatee, expiry);
@@ -608,15 +608,16 @@ contract GovernorDelta is GovernorStorageV3 {
       * @param delegateIds The delegation identifiers to attest
     **/
     function batchAttestVotes(uint proposalId, bytes[] memory delegateIds) external {
-        // @TODO Conflict wrt proposal cant be queued, but has sufficient votes to be attested that would suceed
+        ProposalV2 storage proposal = proposals[proposalId];
         require(delegationActive, "GovernorDelta::batchAttestVotes: delegation not active");
         require(votingModule.virtualized(), "GovernorDelta::batchAttestVotes: unsupported virtualized voting strategy");
         require(state(proposalId) == ProposalState.Queued, "GovernorDelta::batchAttestVotes: proposal not in timelock");
+        require(block.timestamp > proposal.endTime , "GovernorDelta::batchAttestVotes: proposal hasnt concluded");
+        require(block.timestamp < proposal.eta, "GovernorDelta::batchAttestVotes: proposal resolved");
 
         for (uint i = 0; i < delegateIds.length; i++) {
             require(checkDelegation(delegateIds[i]), "GovernorDelta::batchAttestVotes: delegation invalid");
             (address delegator, address delegatee, uint256 expiry) = abi.decode(delegateIds[i], (address, address, uint));
-            ProposalV2 storage proposal = proposals[proposalId];
             Record storage record = proposal.virtualized.records[delegator];
             Record storage receipt = proposal.primary.records[delegator];
             require(record.hasVoted, "GovernorDelta::batchAttestVotes: delegation unspent");
@@ -694,6 +695,50 @@ contract GovernorDelta is GovernorStorageV3 {
         record.votes = votes;
 
         return votes;
+    }
+
+    /**
+      * @notice Delegates voting power to another account
+      * @param delegatee The address to delegate voting power to
+      * @param expiry The timestamp at which the delegation expires
+      * @return id The delegation identifier 
+    **/
+    function _delegate(address delegator, address delegatee, uint expiry) internal returns (bytes memory id) {
+        Stake storage s = stakes[delegator];
+        Delegate storage delegation = delegations[delegator];
+        require(s.amount > 0, "GovernorDelta::delegate: no stake");
+        require(delegationActive, "GovernorDelta::delegate: delegation not active");
+        require(delegatee != address(0), "GovernorDelta::delegate: invalid delegatee");
+        require(expiry > block.timestamp, "GovernorDelta::delegate: insufficient expiry");
+        require(expiry - block.timestamp <= MAX_DELEGATION_PERIOD, "GovernorDelta::delegate: invalid expiry");
+        require(delegation.expiry < block.timestamp, "GovernorDelta::delegate: active delegation");
+        require(s.unlockTime < block.timestamp, "GovernorDelta::delegate: vote already assigned");
+        id = abi.encode(delegator, delegatee, expiry);
+
+        _moveDelegates(delegator, delegatee, expiry);
+        emit Delegation(delegator, delegatee, expiry, keccak256(id));
+    }
+
+    /**
+      * @notice Revokes an active delegation
+      * @dev Delegation identifier is recomputed from stored parameters 
+      * @return id The revoked delegation identifier
+    **/
+    function _revoke(address delegator, address delegatee, uint expiry) internal returns (bytes memory id) {
+        Delegate storage delegation = delegations[delegator];
+        require(delegationActive, "GovernorDelta::revoke: delegation not active");
+        require(delegation.expiry > block.timestamp, "GovernorDelta::revoke: delegation already expired");
+        require(delegation.target == delegatee && delegation.expiry == expiry, "GovernorDelta::revoke: delegation changed");
+
+        if (!votingModule.virtualized()) {
+            require(stakes[delegator].unlockTime < block.timestamp, "GovernorDelta::revoke: delegation lock");
+        }
+
+        id = abi.encode(delegator, delegatee, expiry);
+        uint256 timeRemaining = expiry - block.timestamp;
+
+        _moveDelegates(delegator, delegator, block.timestamp);
+        emit Revoke(delegator, delegatee, timeRemaining, keccak256(id));
     }
 
     /**
@@ -845,39 +890,6 @@ contract GovernorDelta is GovernorStorageV3 {
           delete delegations[delegator];
           stakes[delegator].unlockTime = block.timestamp;
         }
-    }
-
-    function _delegate(address delegator, address delegatee, uint expiry) internal returns (bytes memory id) {
-        Stake storage s = stakes[delegator];
-        Delegate storage delegation = delegations[delegator];
-        require(s.amount > 0, "GovernorDelta::delegate: no stake");
-        require(delegationActive, "GovernorDelta::delegate: delegation not active");
-        require(delegatee != address(0), "GovernorDelta::delegate: invalid delegatee");
-        require(expiry > block.timestamp, "GovernorDelta::delegate: insufficient expiry");
-        require(expiry - block.timestamp <= MAX_DELEGATION_PERIOD, "GovernorDelta::delegate: invalid expiry");
-        require(delegation.expiry < block.timestamp, "GovernorDelta::delegate: active delegation");
-        require(s.unlockTime < block.timestamp, "GovernorDelta::delegate: vote already assigned");
-        id = abi.encode(delegator, delegatee, expiry);
-
-        _moveDelegates(delegator, delegatee, expiry);
-        emit Delegation(delegator, delegatee, expiry, keccak256(id));
-    }
-
-    function _revoke(address delegator, address delegatee, uint expiry) internal returns (bytes memory id) {
-        Delegate storage delegation = delegations[delegator];
-        require(delegationActive, "GovernorDelta::revoke: delegation not active");
-        require(delegation.expiry > block.timestamp, "GovernorDelta::revoke: delegation already expired");
-        require(delegation.target == delegatee && delegation.expiry == expiry, "GovernorDelta::revoke: delegation changed");
-
-        if (!votingModule.virtualized()) {
-            require(stakes[delegator].unlockTime < block.timestamp, "GovernorDelta::revoke: delegation lock");
-        }
-
-        id = abi.encode(delegator, delegatee, expiry);
-        uint256 timeRemaining = expiry - block.timestamp;
-
-        _moveDelegates(delegator, delegator, block.timestamp);
-        emit Revoke(delegator, delegatee, timeRemaining, keccak256(id));
     }
 
     function _dropProposal(uint proposalId, ProposalV2 storage proposal) internal {
