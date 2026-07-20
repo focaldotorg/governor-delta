@@ -9,6 +9,7 @@ contract CanonicalGovernorTest is BaseGovernorTest {
     address public constant DELEGATOR_SECONDARY = 0xE0D268481983B218e83DEe30da1c9f36B56Ffa0a;
     address public constant DELEGATEE_PRIMARY = 0x557a4fC606ae646F585BC73aD2a4fc745a8CBcc8;
     address public constant DELEGATEE_SECONDARY = 0xCbFD1745E492F6a555dF7A9B1E0B3Cd139e69504;
+    address public constant RELAYER = 0x1D63a0F23A0B41bc4Cee4DB6E58Fc67A4a5b3d19;
 
     function setUp() public override {
         super.setUp(); 
@@ -181,6 +182,210 @@ contract CanonicalGovernorTest is BaseGovernorTest {
         governor.revoke();
         vm.stopPrank();
         /* -------------------------------- */     
+    }
+
+    function testDelegateBySig() public {
+        uint256 delegatorPk = 0xD31163A73;
+        address delegator = vm.addr(delegatorPk);
+        uint delegationExpiry = block.timestamp + 7 days;
+        uint sigExpiry = block.timestamp + 1 days;
+        uint expiredSigExpiry = block.timestamp - 1;
+
+        /* ------DELEGATOR------- */
+        vm.startPrank(delegator);
+        governorToken.mint(delegator, STAKEHOLDER_MINOR);
+        approveAndLock(STAKEHOLDER_MINOR);
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        // Attempt invalid signature
+        vm.expectRevert();
+        governor.delegateBySig(DELEGATEE_PRIMARY, delegationExpiry, 0, sigExpiry, 0, bytes32(0), bytes32(0));
+
+        // Attempt expired signature
+        bytes32 expiredDigest = delegationDigest(DELEGATEE_PRIMARY, delegationExpiry, 0, expiredSigExpiry);
+        (uint8 expiredV, bytes32 expiredR, bytes32 expiredS) = vm.sign(delegatorPk, expiredDigest);
+        vm.expectRevert();
+        governor.delegateBySig(DELEGATEE_PRIMARY, delegationExpiry, 0, expiredSigExpiry, expiredV, expiredR, expiredS);
+
+        bytes32 digest = delegationDigest(DELEGATEE_PRIMARY, delegationExpiry, 0, sigExpiry);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(delegatorPk, digest);
+
+        /* ------RELAYER------- */
+        vm.prank(RELAYER);
+        bytes memory id = governor.delegateBySig(DELEGATEE_PRIMARY, delegationExpiry, 0, sigExpiry, v, r, s);
+        /* -------------------------------- */
+
+        (address target, uint expiry) = governor.delegations(delegator);
+
+        require(governor.checkDelegation(id));
+        require(target == DELEGATEE_PRIMARY);
+        require(expiry == delegationExpiry);
+        require(governor.nonces(delegator) == 1);
+
+        // Attempt signature replay
+        vm.expectRevert();
+        governor.delegateBySig(DELEGATEE_PRIMARY, delegationExpiry, 0, sigExpiry, v, r, s);
+    }
+
+    function testDelegateBySigInvalidNonce() public {
+        uint256 delegatorPk = 0xD31163A74;
+        address delegator = vm.addr(delegatorPk);
+        uint delegationExpiry = block.timestamp + 7 days;
+        uint sigExpiry = block.timestamp + 1 days;
+
+        /* ------DELEGATOR------- */
+        vm.startPrank(delegator);
+        governorToken.mint(delegator, STAKEHOLDER_MINOR);
+        approveAndLock(STAKEHOLDER_MINOR);
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        bytes32 digest = delegationDigest(DELEGATEE_PRIMARY, delegationExpiry, 1, sigExpiry);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(delegatorPk, digest);
+
+        // Attempt signature with unexpected nonce
+        vm.expectRevert();
+        governor.delegateBySig(DELEGATEE_PRIMARY, delegationExpiry, 1, sigExpiry, v, r, s);
+    }
+
+    function testDelegateBySigAfterExpiry() public {
+        uint256 delegatorPk = 0xD31163A79;
+        address delegator = vm.addr(delegatorPk);
+        uint initialExpiry = block.timestamp + 1 days;
+        uint nextExpiry = block.timestamp + 7 days;
+        uint sigExpiry = block.timestamp + 2 days;
+
+        /* ------DELEGATOR------- */
+        vm.startPrank(delegator);
+        governorToken.mint(delegator, STAKEHOLDER_MINOR);
+        approveAndLock(STAKEHOLDER_MINOR);
+        governor.delegate(DELEGATEE_PRIMARY, initialExpiry);
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        vm.warp(block.timestamp + 1 days + 1);
+
+        bytes32 digest = delegationDigest(DELEGATEE_SECONDARY, nextExpiry, 0, sigExpiry);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(delegatorPk, digest);
+
+        governor.delegateBySig(DELEGATEE_SECONDARY, nextExpiry, 0, sigExpiry, v, r, s);
+
+        (address target, uint expiry) = governor.delegations(delegator);
+        require(target == DELEGATEE_SECONDARY);
+        require(expiry == nextExpiry);
+        require(governor.nonces(delegator) == 1);
+    }
+
+    function testRevokeBySigInvalidNonce() public {
+        uint256 delegatorPk = 0xD31163A76;
+        address delegator = vm.addr(delegatorPk);
+        uint delegationExpiry = block.timestamp + 7 days;
+        uint sigExpiry = block.timestamp + 1 days;
+
+        /* ------DELEGATOR------- */
+        vm.startPrank(delegator);
+        governorToken.mint(delegator, STAKEHOLDER_MINOR);
+        approveAndLock(STAKEHOLDER_MINOR);
+        governor.delegate(DELEGATEE_PRIMARY, delegationExpiry);
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        bytes32 digest = revocationDigest(DELEGATEE_PRIMARY, delegationExpiry, 1, sigExpiry);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(delegatorPk, digest);
+
+        // Attempt signature with unexpected nonce
+        vm.expectRevert();
+        governor.revokeBySig(DELEGATEE_PRIMARY, delegationExpiry, 1, sigExpiry, v, r, s);
+    }
+
+    function testRevokeBySigExpiredSignature() public {
+        uint256 delegatorPk = 0xD31163A80;
+        address delegator = vm.addr(delegatorPk);
+        uint delegationExpiry = block.timestamp + 7 days;
+        uint sigExpiry = block.timestamp + 1 days;
+
+        /* ------DELEGATOR------- */
+        vm.startPrank(delegator);
+        governorToken.mint(delegator, STAKEHOLDER_MINOR);
+        approveAndLock(STAKEHOLDER_MINOR);
+        governor.delegate(DELEGATEE_PRIMARY, delegationExpiry);
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        bytes32 digest = revocationDigest(DELEGATEE_PRIMARY, delegationExpiry, 0, sigExpiry);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(delegatorPk, digest);
+
+        vm.warp(block.timestamp + 1 days + 1);
+
+        // Attempt expired signature
+        vm.expectRevert();
+        governor.revokeBySig(DELEGATEE_PRIMARY, delegationExpiry, 0, sigExpiry, v, r, s);
+    }
+
+    function testRevokeBySig() public {
+        uint256 delegatorPk = 0xD31163A81;
+        address delegator = vm.addr(delegatorPk);
+        uint delegationExpiry = block.timestamp + 7 days;
+        uint sigExpiry = block.timestamp + 7 days;
+
+        /* ------DELEGATOR------- */
+        vm.startPrank(delegator);
+        governorToken.mint(delegator, STAKEHOLDER_MINOR);
+        approveAndLock(STAKEHOLDER_MINOR);
+        governor.delegate(DELEGATEE_PRIMARY, delegationExpiry);
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        bytes32 digest = revocationDigest(DELEGATEE_PRIMARY, delegationExpiry, 0, sigExpiry);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(delegatorPk, digest);
+
+        /* ------RELAYER------- */
+        vm.prank(RELAYER);
+        governor.revokeBySig(DELEGATEE_PRIMARY, delegationExpiry, 0, sigExpiry, v, r, s);
+        /* -------------------------------- */
+
+        // Attempt signature replay
+        vm.expectRevert();
+        governor.revokeBySig(DELEGATEE_PRIMARY, delegationExpiry, 0, sigExpiry, v, r, s);
+
+        require(governor.nonces(delegator) == 1);
+        (address target, uint expiry) = governor.delegations(delegator);
+        require(target == address(0));
+        require(expiry == 0);
+    }
+
+    function testRevokeBySigRespectsCanonicalLock() public {
+        uint256 delegatorPk = 0xD31163A77;
+        address delegator = vm.addr(delegatorPk);
+        uint delegationExpiry = block.timestamp + 7 days;
+        uint sigExpiry = block.timestamp + 7 days;
+
+        /* ------DELEGATOR------- */
+        vm.startPrank(delegator);
+        governorToken.mint(delegator, STAKEHOLDER_MINOR);
+        approveAndLock(STAKEHOLDER_MINOR);
+        governor.delegate(DELEGATEE_PRIMARY, delegationExpiry);
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        /* ------DELEGATEE------- */
+        vm.startPrank(DELEGATEE_PRIMARY);
+        uint proposalId = pushMockProposal();
+
+        vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
+
+        governor.castVote(proposalId, 1, "");
+        governor.castVirtualVote(proposalId, 1, delegator);
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        bytes32 digest = revocationDigest(DELEGATEE_PRIMARY, delegationExpiry, 0, sigExpiry);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(delegatorPk, digest);
+
+        // Attempt revocation after delegated power has been used
+        vm.expectRevert();
+        governor.revokeBySig(DELEGATEE_PRIMARY, delegationExpiry, 0, sigExpiry, v, r, s);
     }
 
     function testProxyVote() public {

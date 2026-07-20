@@ -275,6 +275,64 @@ contract VirtualGovernorTest is BaseGovernorTest {
         require(forVotes == 17000e18);
     }
 
+    function testRevokeBySig() public {
+        uint256 delegatorPk = 0xD31163B01;
+        address delegator = vm.addr(delegatorPk);
+        uint delegationExpiry = block.timestamp + 7 days;
+        uint sigExpiry = block.timestamp + 7 days;
+
+        vm.startPrank(delegator);
+        governorToken.mint(delegator, STAKEHOLDER_MINOR);
+        approveAndLock(STAKEHOLDER_MINOR);
+        governor.delegate(DELEGATEE_PRIMARY, delegationExpiry);
+        vm.stopPrank();
+
+        vm.startPrank(DELEGATEE_PRIMARY);
+        uint proposalId = pushMockProposal();
+
+        vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
+
+        governor.castVote(proposalId, 1, "");
+        governor.castVirtualVote(proposalId, 1, delegator);
+        vm.stopPrank();
+
+        bytes32 digest = revocationDigest(DELEGATEE_PRIMARY, delegationExpiry, 0, sigExpiry);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(delegatorPk, digest);
+        governor.revokeBySig(DELEGATEE_PRIMARY, delegationExpiry, 0, sigExpiry, v, r, s);
+
+        vm.startPrank(STAKEHOLDER_ALPHA);
+        governor.castVote(proposalId, 1, "");
+        vm.stopPrank();
+
+        vm.startPrank(STAKEHOLDER_BETA);
+        governor.castVote(proposalId, 1, "");
+        vm.stopPrank();
+
+        vm.startPrank(STAKEHOLDER_THETA);
+        governor.castVote(proposalId, 1, "");
+        vm.stopPrank();
+
+        vm.startPrank(STAKEHOLDER_OMEGA);
+        governor.castVote(proposalId, 1, "");
+        vm.stopPrank();
+
+        vm.startPrank(STAKEHOLDER_TAU);
+        governor.castVote(proposalId, 1, "");
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD + 1);
+
+        governor.queue(proposalId);
+
+        vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + 1);
+
+        bytes[] memory votes = new bytes[](1);
+        votes[0] = abi.encode(delegator, DELEGATEE_PRIMARY, delegationExpiry);
+
+        vm.expectRevert();
+        governor.batchAttestVotes(proposalId, votes);
+    }
+
     function setUpScenario() internal {
         /* ------PRIMARY-DELEGATOR------- */
         vm.startPrank(DELEGATOR_PRIMARY);
