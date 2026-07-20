@@ -223,28 +223,22 @@ contract GovernorStorageV3 is IGovernor, GovernorStorageV2 {
         string[] signatures;
         /// @notice The ordered list of calldata to be passed to each call
         bytes[] calldatas;
+        /// @notice Pure votes cast
+        Ballot primary;
+        /// @notice Veto votes cast
+        Ballot veto;
+        /// @notice Virtual votes cast
+        Ballot virtualized;
         /// @notice The timestamp at which voting begins
         uint startTime;
         /// @notice The timestamp at which voting end
         uint endTime;
-        /// @notice The proposal voting results
-        Tally results;
-        /// @notice The veto proposal voting results 
-        Tally veto;
         /// @notice Flag marking whether the proposal has been canceled
         bool canceled;
         /// @notice Flag marking whether the proposal has been executed
         bool executed;
         /// @notice Flag marking whether the proposal has been vetoed
         bool contested;
-    }
-
-    /// @notice Proposal tallys 
-    struct Tally {
-        /// @notice Pure votes cast
-        Ballot primary;
-        /// @notice Virtual votes cast
-        Ballot virtualized;
     }
 
     /// @notice Proposal vote record
