@@ -455,8 +455,10 @@ contract GovernorDelta is GovernorStorageV3 {
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
         address signatory = ecrecover(digest, v, r, s);
         require(signatory != address(0), "GovernorDelta::delegateBySig: invalid signature");
-        require(nonce == nonces[signatory]++, "GovernorDelta::delegateBySig: invalid nonce");
+        uint currentNonce = nonces[signatory];
+        require(nonce == currentNonce, "GovernorDelta::delegateBySig: invalid nonce");
         require(block.timestamp <= sigExpiry, "GovernorDelta::delegateBySig: signature expired");
+        nonces[signatory] = currentNonce + 1;
 
         return _delegate(signatory, delegatee, expiry);
     }
@@ -488,8 +490,10 @@ contract GovernorDelta is GovernorStorageV3 {
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
         address signatory = ecrecover(digest, v, r, s);
         require(signatory != address(0), "GovernorDelta::revokeBySig: invalid signature");
-        require(nonce == nonces[signatory]++, "GovernorDelta::revokeBySig: invalid nonce");
+        uint currentNonce = nonces[signatory];
+        require(nonce == currentNonce, "GovernorDelta::revokeBySig: invalid nonce");
         require(block.timestamp <= sigExpiry, "GovernorDelta::revokeBySig: signature expired");
+        nonces[signatory] = currentNonce + 1;
 
         return _revoke(signatory, delegatee, expiry);
     }
