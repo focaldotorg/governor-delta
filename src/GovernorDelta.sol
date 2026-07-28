@@ -102,6 +102,14 @@ contract GovernorDelta is GovernorStorageV3 {
     }
 
     /**
+      * @notice Returns domain index for EIP-712 signatures
+      * @return The bytes32 domain seperator value 
+    **/
+    function domainSeparator() public view returns (bytes32) {
+        return keccak256(abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name)), _getChainId(), address(this)));
+    }
+
+    /**
       * @notice Returns the stake of a given account
       * @param owner The address of the stakeholder
       * @return amount The total amount of tokens staked
@@ -503,9 +511,8 @@ contract GovernorDelta is GovernorStorageV3 {
     **/
     function castVoteBySig(uint proposalId, uint8 support, uint8 v, bytes32 r, bytes32 s) external {
         require(state(proposalId) == ProposalState.Active, "GovernorDelta::castVote: voting is closed");
-        bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name)), _getChainId(), address(this)));
         bytes32 structHash = keccak256(abi.encode(VOTE_TYPEHASH, proposalId, support));
-        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator(), structHash));
         address signatory = ecrecover(digest, v, r, s);
         require(signatory != address(0), "GovernorDelta::castVoteBySig: invalid signature");
         uint votes = _logVote(signatory, proposalId, support, false);
@@ -520,9 +527,8 @@ contract GovernorDelta is GovernorStorageV3 {
     function castVetoVoteBySig(uint proposalId, uint8 support, uint8 v, bytes32 r, bytes32 s) external {
         require(state(proposalId) == ProposalState.Queued, "GovernorDelta::castVetoVote: proposal not queued");
         require(status(proposalId) == ProposalStatus.Contested, "GovernorDelta::castVetoVote: proposal uncontested");
-        bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name)), _getChainId(), address(this)));
         bytes32 structHash = keccak256(abi.encode(VETO_TYPEHASH, proposalId, support));
-        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator(), structHash));
         address signatory = ecrecover(digest, v, r, s);
         require(signatory != address(0), "GovernorDelta::castVetoBySig: invalid signature");
         uint votes = _logVote(signatory, proposalId, support, true);
@@ -542,9 +548,8 @@ contract GovernorDelta is GovernorStorageV3 {
       * @return id The delegation identifier
     **/
     function delegateBySig(address delegatee, uint expiry, uint nonce, uint sigExpiry, uint8 v, bytes32 r, bytes32 s) external returns (bytes memory id) {
-        bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name)), _getChainId(), address(this)));
         bytes32 structHash = keccak256(abi.encode(DELEGATION_TYPEHASH, delegatee, expiry, nonce, sigExpiry));
-        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator(), structHash));
         address signatory = ecrecover(digest, v, r, s);
         require(signatory != address(0), "GovernorDelta::delegateBySig: invalid signature");
         uint currentNonce = nonces[signatory];
@@ -567,9 +572,8 @@ contract GovernorDelta is GovernorStorageV3 {
       * @return id The revoked delegation identifier
     **/
     function revokeBySig(address delegatee, uint expiry, uint nonce, uint sigExpiry, uint8 v, bytes32 r, bytes32 s) external returns (bytes memory id) {
-        bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name)), _getChainId(), address(this)));
         bytes32 structHash = keccak256(abi.encode(REVOCATION_TYPEHASH, delegatee, expiry, nonce, sigExpiry));
-        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator(), structHash));
         address signatory = ecrecover(digest, v, r, s);
         require(signatory != address(0), "GovernorDelta::revokeBySig: invalid signature");
         uint currentNonce = nonces[signatory];
