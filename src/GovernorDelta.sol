@@ -302,6 +302,26 @@ contract GovernorDelta is GovernorStorageV3 {
     }
 
     /**
+      * @notice Delegates voting power to another account
+      * @param delegatee The address to delegate voting power to
+      * @param expiry The timestamp at which the delegation expires
+      * @return id The delegation identifier 
+    **/
+    function delegate(address delegatee, uint expiry) external returns (bytes memory id) {
+        return _delegate(msg.sender, delegatee, expiry);
+    }
+
+    /**
+      * @notice Revokes an active delegation
+      * @dev Delegation identifier is recomputed from stored parameters 
+      * @return id The revoked delegation identifier
+    **/
+    function revoke() external returns (bytes memory id) {
+        Delegate storage d = delegations[msg.sender];
+        return _revoke(msg.sender, d.target, d.expiry);
+    }
+
+    /**
       * @notice Function used to propose a new proposal. Sender must have delegates above the proposal threshold
       * @param tier Graduated proposal severity/tier
       * @param targets Target addresses for proposal calls
@@ -442,26 +462,6 @@ contract GovernorDelta is GovernorStorageV3 {
     }
 
     /**
-      * @notice Delegates voting power to another account
-      * @param delegatee The address to delegate voting power to
-      * @param expiry The timestamp at which the delegation expires
-      * @return id The delegation identifier 
-    **/
-    function delegate(address delegatee, uint expiry) external returns (bytes memory id) {
-        return _delegate(msg.sender, delegatee, expiry);
-    }
-
-    /**
-      * @notice Revokes an active delegation
-      * @dev Delegation identifier is recomputed from stored parameters 
-      * @return id The revoked delegation identifier
-    **/
-    function revoke() external returns (bytes memory id) {
-        Delegate storage d = delegations[msg.sender];
-        return _revoke(msg.sender, d.target, d.expiry);
-    }
-
-    /**
       * @notice Cast a virtual vote on behalf of a delegator
       * @dev Commits delegated voting power to the virtualized ballot
       * @param proposalId The id of the proposal to vote on
@@ -475,6 +475,21 @@ contract GovernorDelta is GovernorStorageV3 {
         uint votes = _commitVote(delegator, proposalId, support);
 
         emit VoteCast(msg.sender, proposalId, support, votes, "");
+    }
+
+    /**
+      * @notice Cast a veto vote to contest a queued proposal
+      * @dev Only valid during the timelock period  
+      * @param proposalId The id of the proposal to veto vote on
+      * @param support The support value for the vote. 0=against, 1=for, 2=abstain
+      * @param reason The reason given for the veto vote by the voter
+    **/
+    function castVetoVote(uint proposalId, uint8 support, string calldata reason) public {
+        require(state(proposalId) == ProposalState.Queued, "GovernorDelta::castVetoVote: proposal not queued");
+        require(status(proposalId) == ProposalStatus.Contested, "GovernorDelta::castVetoVote: proposal uncontested");
+        uint votes = _logVote(msg.sender, proposalId, support, true);
+
+        emit VetoVoteCast(msg.sender, proposalId, support, votes, reason);
     }
 
     /**
@@ -496,21 +511,6 @@ contract GovernorDelta is GovernorStorageV3 {
         uint votes = _logVote(signatory, proposalId, support, false);
 
         emit VoteCast(signatory, proposalId, support, votes, "");
-    }
-
-    /**
-      * @notice Cast a veto vote to contest a queued proposal
-      * @dev Only valid during the timelock period  
-      * @param proposalId The id of the proposal to veto vote on
-      * @param support The support value for the vote. 0=against, 1=for, 2=abstain
-      * @param reason The reason given for the veto vote by the voter
-    **/
-    function castVetoVote(uint proposalId, uint8 support, string calldata reason) public {
-        require(state(proposalId) == ProposalState.Queued, "GovernorDelta::castVetoVote: proposal not queued");
-        require(status(proposalId) == ProposalStatus.Contested, "GovernorDelta::castVetoVote: proposal uncontested");
-        uint votes = _logVote(msg.sender, proposalId, support, true);
-
-        emit VetoVoteCast(msg.sender, proposalId, support, votes, reason);
     }
 
     /**
