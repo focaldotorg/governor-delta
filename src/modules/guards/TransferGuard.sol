@@ -1,67 +1,94 @@
 pragma solidity ^0.8.10;
 
 import "@interfaces/IProposalGuard.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 contract GuardStorage {
-  
+ 
     struct Token {
-        address target;
+        uint store;
         uint limit;
         uint allowance;
-        uint balance;
+        address source;
     }
 
-    struct Entry {
-      uint index;
-      address value;
-    }
+    event TokenAdded(address indexed token);
+
+    event TokenRemoved(address indexed token);
+
+    event TokenUpdated(address indexed token, uint256 limit, uint256 allowance);
 
 }
 
 contract TransferGuard is GuardStorage, IProposalGuard {
 
+    using EnumerableSet for EnumerableSet.AddressSet;
+
     address public admin;
 
-    Entry[] public tokens;
+    address public timelock;
 
-    mapping((address) => uint) public store;
+    EnumerableSet.AddressSet private tokens;
 
-    mapping((address) => Token) public assets;
+    mapping(address => Token) public assets;
 
-    constructor(address governor_, Token memory tokens_) {
-        admin = governor_;
+    uint constant public MAX_SET_ENTRIES = 5;
 
-        _set(tokens_);
+    constructor(address admin_, address timelock_, Token[] memory tokens_) {
+        admin = admin_;
+        timelock = timelock_;
+
+        _set(tokens_, false);
     }  
 
-    function record() public {      
-      require(msg.sender === admin, "TransferGuard::: record: only admin");
+    function record(address target) public {
+        require(msg.sender == admin || msg.sender == timelock, "TransferGuard::record: only admin");
     }
   
-    function compare() public {
-       require(msg.sender === admin, "TransferGuard::: compare: only admin");
+    function compare(address target) public {
+        require(msg.sender == admin || msg.sender == timelock, "TransferGuard::compare: only admin");
     }
   
-    function remove() public {
-      require(msg.sender === admin, "TransferGuard::: remove: only admin");
+    function remove(address token) public {
+        require(msg.sender == admin, "TransferGuard::remove: only admin");
+        require(tokens.remove(token), "TransferGuard::remove: not tracked");
+        delete assets[token];
+
+        emit TokenRemoved(token);
     }
 
-    function add() public {
-      require(msg.sender === admin, "TransferGuard::: add: only admin");
+    function add(Token memory token) public {
+        require(msg.sender == admin, "TransferGuard::add: only admin");
+        require(tokens.length() + 1 <= MAX_SET_ENTRIES, "TransferGuard::add: max tokens added");
+        require(tokens.add(token.source), "TransferGuard::add: already tracked");
+        assets[token.source] = token;
+
+        emit TokenAdded(token.source);
     }
 
-    function overwrite(Token memory inputs) public {
-      require(msg.sender === admin, "TransferGuard::: overwrite: only admin");
-      _set(inputs);
+    function overwrite(Token[] memory inputs) public {
+        require(msg.sender == admin, "TransferGuard::overwrite: only admin"); 
+
+        _set(inputs, true);
     }
 
-    function _set(Token memory inputs) internal {
-        delete tokens;
-        delete assets;
+    function _set(Token[] memory inputs, bool onlySet) internal {
+        require(inputs.length <= MAX_SET_ENTRIES, "TransferGuard::overwrite: invalid input");
 
         for (uint8 i = 0; i < inputs.length; i++) {
-            tokens.push(Entry(i, inputs[i].target));
-            assets[inputs[i].target] = tokens[i];
+            address token = inputs[i].source;
+
+            if (onlySet) {
+                require(tokens.contains(token), "TransferGuard::overwrite: token not in set");
+
+                emit TokenUpdated(token, inputs[i].limit, inputs[i].allowance);
+            } else {
+                require(tokens.add(token), "TransferGuard::overwrite: token already in set");
+
+                emit TokenAdded(token);
+            }
+
+            assets[token] = inputs[i];
         } 
     }
 
