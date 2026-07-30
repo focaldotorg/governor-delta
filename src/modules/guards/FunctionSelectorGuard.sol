@@ -28,7 +28,7 @@ contract FunctionSelectorGuard is GuardStorage, IProposalGuard {
 
     function record(address target, uint proposalId) public {
         require(msg.sender == governor || msg.sender == timelock, "TransferGuard::record: only admin");
-        (, , string[] memory signatures,) IGovernorDelta(governor).getActions(proposalId);
+        (, , string[] memory signatures,) = IGovernorDelta(governor).getActions(proposalId);
 
         for (uint8 i = 0; i < signatures.length; i++) {
             require(!blacklist[signatures[i]], "WhitelistGuard::record: action call signature is blacklisted");
@@ -55,16 +55,16 @@ contract FunctionSelectorGuard is GuardStorage, IProposalGuard {
         emit BlacklistSelector(selector);
     }
 
-    function overwrite(address[] memory selectors, bool option) public {
+    function overwrite(string[] memory selectors, bool option) public {
         require(msg.sender == governor, "TransferGuard::overwrite: only admin"); 
 
         _set(selectors, option);
     }
 
-    function _set(address[] memory entries, bool flag) internal {
+    function _set(string[] memory entries, bool flag) internal {
         for (uint8 i = 0; i < entries.length; i++) {
-            string selector = entries[i];
-            blacklist[target] = flag;
+            string memory selector = entries[i];
+            blacklist[selector] = flag;
 
             if (flag) emit BlacklistSelector(selector);
             else emit WhitelistSelector(selector); 

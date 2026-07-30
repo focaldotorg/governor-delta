@@ -167,7 +167,6 @@ contract GovernorStorageV3 is IGovernor, GovernorStorageV2 {
     /// @notice The number of staked canonical tokens locked by stakers
     uint public totalStaked; 
 
-
     /// @notice A record of states for signing / validating signatures
     mapping (address => uint) public nonces;
 

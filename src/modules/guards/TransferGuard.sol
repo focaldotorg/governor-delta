@@ -2,7 +2,7 @@ pragma solidity ^0.8.10;
 
 import "@interfaces/IProposalGuard.sol";
 import "@interfaces/IERC20.sol";
-import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import "@openzeppelin/utils/structs/EnumerableSet.sol";
 
 contract GuardStorage {
  
@@ -25,7 +25,7 @@ contract TransferGuard is GuardStorage, IProposalGuard {
 
     using EnumerableSet for EnumerableSet.AddressSet;
 
-    address public admin;
+    address public governor;
 
     address public timelock;
 
@@ -35,8 +35,8 @@ contract TransferGuard is GuardStorage, IProposalGuard {
 
     uint constant public MAX_SET_ENTRIES = 5;
 
-    constructor(address admin_, address timelock_, Token[] memory tokens_) {
-        admin = admin_;
+    constructor(address governor_, address timelock_, Token[] memory tokens_) {
+        governor = governor_;
         timelock = timelock_;
 
         _set(tokens_, false);
@@ -47,7 +47,7 @@ contract TransferGuard is GuardStorage, IProposalGuard {
     }
 
     function record(address target, uint proposalId) public {
-        require(msg.sender == admin || msg.sender == timelock, "TransferGuard::record: only admin");
+        require(msg.sender == governor || msg.sender == timelock, "TransferGuard::record: only admin");
         address[] memory entries = tokens.values();
 
         for (uint8 i = 0; i < entries.length; i++) {
@@ -57,7 +57,7 @@ contract TransferGuard is GuardStorage, IProposalGuard {
     }
   
     function compare(address target, uint proposalId) public {
-        require(msg.sender == admin || msg.sender == timelock, "TransferGuard::compare: only admin");
+        require(msg.sender == governor || msg.sender == timelock, "TransferGuard::compare: only admin");
         address[] memory entries = tokens.values();
 
         for (uint8 i = 0; i < entries.length; i++) {
@@ -72,14 +72,12 @@ contract TransferGuard is GuardStorage, IProposalGuard {
                 account.allowance -= delta;
             }
 
-            account.store = balance;
-
             emit TokenUpdated(token, account.limit, account.allowance);
         }
     }
   
     function remove(address token) public {
-        require(msg.sender == admin, "TransferGuard::remove: only admin");
+        require(msg.sender == governor, "TransferGuard::remove: only admin");
         require(tokens.remove(token), "TransferGuard::remove: not tracked");
         delete assets[token];
 
@@ -87,7 +85,7 @@ contract TransferGuard is GuardStorage, IProposalGuard {
     }
 
     function add(Token memory token) public {
-        require(msg.sender == admin, "TransferGuard::add: only admin");
+        require(msg.sender == governor, "TransferGuard::add: only admin");
         require(tokens.length() + 1 <= MAX_SET_ENTRIES, "TransferGuard::add: max tokens added");
         require(tokens.add(token.source), "TransferGuard::add: already tracked");
         assets[token.source] = token;
@@ -96,13 +94,13 @@ contract TransferGuard is GuardStorage, IProposalGuard {
     }
 
     function overwrite(Token[] memory inputs) public {
-        require(msg.sender == admin, "TransferGuard::overwrite: only admin"); 
+        require(msg.sender == governor, "TransferGuard::overwrite: only admin"); 
 
         _set(inputs, true);
     }
 
     function _set(Token[] memory entries, bool onlySet) internal {
-        require(inputs.length <= MAX_SET_ENTRIES, "TransferGuard::overwrite: invalid input");
+        require(entries.length <= MAX_SET_ENTRIES, "TransferGuard::overwrite: invalid input");
 
         for (uint8 i = 0; i < entries.length; i++) {
             address token = entries[i].source;

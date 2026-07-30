@@ -2,9 +2,9 @@ pragma solidity ^0.8.10;
 
 interface IProposalGuard {
 
-  function record() external public view;
+  function record(address target, uint proposalId) external;
 
-  function compare() external public view;
+  function compare(address target, uint proposalId) external;
 
 }
 

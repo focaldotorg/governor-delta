@@ -28,7 +28,7 @@ contract WhitelistGuard is GuardStorage, IProposalGuard {
 
     function record(address target, uint proposalId) public {
         require(msg.sender == governor || msg.sender == timelock, "TransferGuard::record: only admin");
-        (address[] memory targets, , ,) IGovernorDelta(governor).getActions(proposalId);
+        (address[] memory targets, , ,) = IGovernorDelta(governor).getActions(proposalId);
 
         for (uint8 i = 0; i < targets.length; i++) {
             require(whitelist[targets[i]], "WhitelistGuard::record: action call target not whitelisted");
