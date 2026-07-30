@@ -41,7 +41,6 @@ Delta introduces a gradual proposal framework, each tier configured with an inde
 | 0 | Low | 5,000 | 500 | 7 days |
 | 1 | Medium | 15,000 | 3,000 | 14 days |
 | 2 | High | 33,000 | 10,00 | 38 days |
-| 3 | Critical | 51,000 | 20,000 | 92 days |
 
 At deployment all tiers are configurable and adjustable through governance, it is advised **for organisations not interested in adopting the graduated proposal framework to assign all tiers equal parameters** as being the default option.
 

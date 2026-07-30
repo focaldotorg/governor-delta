@@ -51,9 +51,6 @@ contract GovernorDelta is GovernorStorageV3 {
     /// @notice Proposal tier 2 (high) minimum canonical weight
     uint public constant DEFAULT_TIER_2_QUORUM = 33000e18;
 
-    /// @notice Proposal tier 3 (critical) minimum canonical weight
-    uint public constant DEFAULT_TIER_3_QUORUM = 51000e18;
-
     /// @notice The maximum number of actions that can be included in a proposal
     uint public constant MAX_PROPOSAL_OPERATIONS = 10; 
 
@@ -93,9 +90,7 @@ contract GovernorDelta is GovernorStorageV3 {
         proposalConfig[0] = Graduated({ quorum: DEFAULT_TIER_0_QUORUM, duration: votingPeriod_, quota: proposalQuota_ });
         proposalConfig[1] = Graduated({ quorum: DEFAULT_TIER_1_QUORUM, duration: votingPeriod_, quota: proposalQuota_ });
         proposalConfig[2] = Graduated({ quorum: DEFAULT_TIER_2_QUORUM, duration: votingPeriod_, quota: proposalQuota_ });
-        proposalConfig[3] = Graduated({ quorum: DEFAULT_TIER_3_QUORUM, duration: votingPeriod_, quota: proposalQuota_ });
-        vetoQuorum = DEFAULT_VETO_QUORUM; 
-        vetoQuota = DEFAULT_VETO_QUOTA;
+        vetoQuorum = DEFAULT_VETO_QUORUM;
         vetoPeriod = DEFAULT_VETO_PERIOD;
 
         votingModule = IVotingStrategy(address(new WeightedVotingStrategy(address(this))));
@@ -340,7 +335,7 @@ contract GovernorDelta is GovernorStorageV3 {
       * @return Proposal id of new proposal
       */
     function propose(uint8 tier, address[] memory targets, uint[] memory values, string[] memory signatures, bytes[] memory calldatas, string memory description) public returns (uint) {
-        require(tier < 4, "GovernorDelta::propose: Invalid proposal tier");
+        require(tier < 3, "GovernorDelta::propose: Invalid proposal tier");
         Graduated storage framework = proposalConfig[tier];
         // Reject proposals before initiating as Governor
         require(initialProposalId != 0, "GovernorDelta::propose: Governor not initialized");
