@@ -1,6 +1,7 @@
 pragma solidity ^0.8.10;
 
 import "@interfaces/IProposalGuard.sol";
+import "@interfaces/IERC20.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 contract GuardStorage {
@@ -39,14 +40,42 @@ contract TransferGuard is GuardStorage, IProposalGuard {
         timelock = timelock_;
 
         _set(tokens_, false);
-    }  
+    } 
+
+    function inventory(address target, address token) public returns (uint) {
+        return token == address(0) ? address(target).balance : IERC20(token).balanceOf(target); 
+    }
 
     function record(address target) public {
         require(msg.sender == admin || msg.sender == timelock, "TransferGuard::record: only admin");
+        address[] memory entries = tokens.values();
+
+        for (uint256 i = 0; i < entries.length; i++) {
+           address token = entries[i];
+           assets[token].store = inventory(target, token);
+        }
     }
   
     function compare(address target) public {
         require(msg.sender == admin || msg.sender == timelock, "TransferGuard::compare: only admin");
+        address[] memory entries = tokens.values();
+
+        for (uint8 i = 0; i < entries.length; i++) {
+            address token = entries[i];
+            Token storage account = assets[token];
+            uint balance = inventory(target, token);
+
+            if (balance < account.store) {
+                uint delta = account.store - balance;
+                require(delta <= account.limit, "TransferGuard::compare: exceeds limit");
+                require(delta <= account.allowance, "TransferGuard::compare: exceeds allowance");
+                account.allowance -= delta;
+            }
+
+            account.store = balance;
+
+            emit TokenUpdated(token, account.limit, account.allowance);
+        }
     }
   
     function remove(address token) public {
@@ -72,23 +101,23 @@ contract TransferGuard is GuardStorage, IProposalGuard {
         _set(inputs, true);
     }
 
-    function _set(Token[] memory inputs, bool onlySet) internal {
+    function _set(Token[] memory entries, bool onlySet) internal {
         require(inputs.length <= MAX_SET_ENTRIES, "TransferGuard::overwrite: invalid input");
 
-        for (uint8 i = 0; i < inputs.length; i++) {
-            address token = inputs[i].source;
+        for (uint8 i = 0; i < entries.length; i++) {
+            address token = entries[i].source;
 
             if (onlySet) {
                 require(tokens.contains(token), "TransferGuard::overwrite: token not in set");
 
-                emit TokenUpdated(token, inputs[i].limit, inputs[i].allowance);
+                emit TokenUpdated(token, entries[i].limit, entries[i].allowance);
             } else {
                 require(tokens.add(token), "TransferGuard::overwrite: token already in set");
 
                 emit TokenAdded(token);
             }
 
-            assets[token] = inputs[i];
+            assets[token] = entries[i];
         } 
     }
 
