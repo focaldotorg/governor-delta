@@ -46,17 +46,17 @@ contract TransferGuard is GuardStorage, IProposalGuard {
         return token == address(0) ? address(target).balance : IERC20(token).balanceOf(target); 
     }
 
-    function record(address target) public {
+    function record(address target, uint proposalId) public {
         require(msg.sender == admin || msg.sender == timelock, "TransferGuard::record: only admin");
         address[] memory entries = tokens.values();
 
-        for (uint256 i = 0; i < entries.length; i++) {
+        for (uint8 i = 0; i < entries.length; i++) {
            address token = entries[i];
            assets[token].store = inventory(target, token);
         }
     }
   
-    function compare(address target) public {
+    function compare(address target, uint proposalId) public {
         require(msg.sender == admin || msg.sender == timelock, "TransferGuard::compare: only admin");
         address[] memory entries = tokens.values();
 

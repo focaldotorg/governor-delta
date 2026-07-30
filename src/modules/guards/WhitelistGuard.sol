@@ -66,7 +66,8 @@ contract WhitelistGuard is GuardStorage, IProposalGuard {
             address target = entries[i];
             whitelist[target] = flag;
 
-            emit PermitAddress(target);
+            if (flag) emit PermitAddress(target);
+            else emit OmitAddress(target); 
         } 
     }
 
