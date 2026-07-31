@@ -34,9 +34,6 @@ contract BaseGovernorTest is Test {
     uint public constant DEFAULT_TIER_2_QUORUM = 33000e18;
     uint public constant DEFAULT_TIER_2_QUOTA = 5000e18;
     uint public constant DEFAULT_TIER_2_DURATION = 38 days;
-    uint public constant DEFAULT_TIER_3_QUORUM = 51000e18;
-    uint public constant DEFAULT_TIER_3_QUOTA = 10000e18;
-    uint public constant DEFAULT_TIER_3_DURATION = 91 days;
 
     address public constant STAKEHOLDER_PRIMARY   = 0x742d35Cc6634C0532925a3b844Bc454e4438f44e;
     address public constant STAKEHOLDER_SECONDARY = 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045;
@@ -392,12 +389,11 @@ contract BaseGovernorTest is Test {
     }
 
     function testProposalConfig() public {
-        GovernorStorageV3.Graduated[4] memory config;
-
-        config[0] = GovernorStorageV3.Graduated({ quorum: STAKEHOLDER_MINOR, quota: DEFAULT_TIER_0_QUOTA, duration: DEFAULT_TIER_0_DURATION });
-        config[1] = GovernorStorageV3.Graduated({ quorum: DEFAULT_TIER_1_QUORUM, quota: DEFAULT_TIER_1_QUOTA, duration: DEFAULT_TIER_1_DURATION });
-        config[2] = GovernorStorageV3.Graduated({ quorum: DEFAULT_TIER_2_QUORUM, quota: DEFAULT_TIER_2_QUOTA, duration: DEFAULT_TIER_2_DURATION });
-        config[3] = GovernorStorageV3.Graduated({ quorum: DEFAULT_TIER_3_QUORUM, quota: DEFAULT_TIER_3_QUOTA, duration: DEFAULT_TIER_3_DURATION });
+        GovernorStorageV3.Graduated[3] memory config;
+        address[] memory guardPolicy = new address[](0);
+        config[0] = GovernorStorageV3.Graduated(DEFAULT_TIER_0_QUOTA, STAKEHOLDER_MINOR, DEFAULT_TIER_0_DURATION, guardPolicy);
+        config[1] = GovernorStorageV3.Graduated(DEFAULT_TIER_1_QUOTA, DEFAULT_TIER_1_QUORUM, DEFAULT_TIER_1_DURATION, guardPolicy);
+        config[2] = GovernorStorageV3.Graduated(DEFAULT_TIER_2_QUOTA, DEFAULT_TIER_2_QUORUM, DEFAULT_TIER_2_DURATION, guardPolicy);
 
         /* --------TIMELOCK-------- */
         vm.startPrank(address(timelock));
@@ -413,6 +409,7 @@ contract BaseGovernorTest is Test {
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
         governor.castVote(proposalId, 1, "");
+        /* -------------------------------- */
 
         vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
 
@@ -425,7 +422,6 @@ contract BaseGovernorTest is Test {
 
         governor.queue(proposalId);
         vm.stopPrank();
-        /* -------------------------------- */
     }
 
     function testSetVetoQuota() public {

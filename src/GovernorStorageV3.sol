@@ -274,6 +274,8 @@ contract GovernorStorageV3 is IGovernor, GovernorStorageV2 {
         uint quorum;
         /// @notice The duration of which a proposal will be active for voting
         uint duration;
+        /// @notice Tier guard module target addresses
+        address[] guards;
     }
 
     /// @notice Possible states that a proposal may be in

@@ -15,7 +15,7 @@ contract StakingGuard is IProposalGuard {
     constructor(address governor_, address timelock_) {
         governor = governor_;
         timelock = timelock_;
-        token = IGovernorDelta(governor_).canconicalToken();
+        token = IGovernorDelta(governor_).canonicalToken();
     } 
 
     function record(address target, uint proposalId) public {

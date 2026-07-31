@@ -3,6 +3,7 @@ pragma solidity ^0.8.10;
 import "@interfaces/IGovernorAlpha.sol";
 import "@strategies/WeightedVotingStrategy.sol";
 import "@root/GovernorStorageV3.sol";
+import "@guards/StakingGuard.sol";
 
 contract GovernorDelta is GovernorStorageV3 {
 
@@ -69,6 +70,12 @@ contract GovernorDelta is GovernorStorageV3 {
     /// @notice The EIP-712 typehash for the contract's domain
     bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
 
+    modifier guarded(address target, uint proposalId) {
+        _entryStateChecks(target, proposalId);
+        _;
+        _exitStateChecks(target, proposalId);
+    } 
+
     /**
       * @notice Used to initialize the contract during delegator constructor
       * @param timelock_ The address of the Timelock
@@ -83,17 +90,18 @@ contract GovernorDelta is GovernorStorageV3 {
         require(timelock_ != address(0), "GovernorDelta::initialize: invalid timelock address");
         require(token_ != address(0), "GovernorDelta::initialize: invalid canonical token address");
         require(votingDelay_ >= MIN_VOTING_DELAY && votingDelay_ <= MAX_VOTING_DELAY, "GovernorDelta:: invalid voting delay");
-
-        votingDelay = votingDelay_;
         timelock = ITimelock(timelock_);
         canonicalToken = IERC20(token_);
-        proposalConfig[0] = Graduated({ quorum: DEFAULT_TIER_0_QUORUM, duration: votingPeriod_, quota: proposalQuota_ });
-        proposalConfig[1] = Graduated({ quorum: DEFAULT_TIER_1_QUORUM, duration: votingPeriod_, quota: proposalQuota_ });
-        proposalConfig[2] = Graduated({ quorum: DEFAULT_TIER_2_QUORUM, duration: votingPeriod_, quota: proposalQuota_ });
         vetoQuorum = DEFAULT_VETO_QUORUM;
         vetoPeriod = DEFAULT_VETO_PERIOD;
-
+        votingDelay = votingDelay_;
         votingModule = IVotingStrategy(address(new WeightedVotingStrategy(address(this))));
+        address guard = address(new StakingGuard(address(this), timelock_));
+        address[] memory defaultPolicy = new address[](1);
+        defaultPolicy[0] = guard;
+        proposalConfig[0] = Graduated(proposalQuota_, DEFAULT_TIER_0_QUORUM, votingPeriod_, defaultPolicy);
+        proposalConfig[1] = Graduated(proposalQuota_, DEFAULT_TIER_1_QUORUM, votingPeriod_, defaultPolicy);
+        proposalConfig[2] = Graduated(proposalQuota_, DEFAULT_TIER_2_QUORUM, votingPeriod_, defaultPolicy);
     }
 
     /**
@@ -392,7 +400,7 @@ contract GovernorDelta is GovernorStorageV3 {
       * @notice Executes a queued proposal if eta has passed
       * @param proposalId The id of the proposal to execute
     **/
-    function execute(uint proposalId) public payable {
+    function execute(uint proposalId) guarded(address(timelock), proposalId) public payable {
         require(status(proposalId) != ProposalStatus.Dropped, "GovernorDelta:execute: cannot execute contested proposal");
         require(state(proposalId) == ProposalState.Queued, "GovernorDelta::execute: proposal can only be executed if it is queued");
         ProposalV2 storage proposal = proposals[proposalId];
@@ -758,10 +766,10 @@ contract GovernorDelta is GovernorStorageV3 {
      * @dev Tier 0 (low) to tier 3 (critical), each with independent quorum and duration
      * @param configs Fixed array of four tier configurations, ordered by severity ascending
     **/
-    function _setProposalConfig(Graduated[4] memory configs) external {
+    function _setProposalConfig(Graduated[3] memory configs) external {
         require(msg.sender == admin, "GovernorDelta::_setProposalConfig: admin only");
 
-        for (uint8 i = 0; i < 4; i++) {
+        for (uint8 i = 0; i < 3; i++) {
             require(configs[i].quorum >= MIN_QUORUM_VOTES, "GovernorDelta::_setProposalConfig: quorum below minimum");
             require(configs[i].duration >= MIN_VOTING_PERIOD && configs[i].duration <= MAX_VOTING_PERIOD, "GovernorDelta::_setProposalConfig: invalid duration");
             uint oldProposalQuorum = proposalConfig[i].quorum;
@@ -876,6 +884,23 @@ contract GovernorDelta is GovernorStorageV3 {
         emit NewPendingAdmin(oldPendingAdmin, pendingAdmin);
     }
 
+    function _entryStateChecks(address target, uint proposalId) internal {
+        uint8 tier = proposals[proposalId].tier;
+        address[] memory guards  = proposalConfig[tier].guards;
+
+        for (uint8 i = 0; i < guards.length; i++) {
+            IProposalGuard(guards[i]).record(target, proposalId);
+        }
+    }
+
+    function _exitStateChecks(address target, uint proposalId) internal {
+        uint8 tier = proposals[proposalId].tier;
+        address[] memory guards  = proposalConfig[tier].guards;
+
+        for (uint8 i = 0; i < guards.length; i++) {
+            IProposalGuard(guards[i]).compare(target, proposalId);
+        }
+    }
 
     function _queueOrRevert(address target, uint value, string memory signature, bytes memory data, uint eta) internal {
         require(!timelock.queuedTransactions(keccak256(abi.encode(target, value, signature, data, eta))), "GovernorBravo::queueOrRevertInternal: identical proposal action already queued at eta");

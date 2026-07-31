@@ -5,9 +5,9 @@ import "@interfaces/IGovernorDelta.sol";
 
 contract GuardStorage {
 
-    event BlacklistSelector(bytes8 selector);
+    event BlacklistSelector(string selector);
 
-    event WhitelistSelector(bytes8 selector);
+    event WhitelistSelector(string selector);
 
 }
 
