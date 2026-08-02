@@ -185,7 +185,7 @@ contract BaseGovernorTest is Test {
         require(address(governor).balance == governorBalanceBefore);
     }
 
-    function testRelayGovernorAssetRecovery() public {
+    function testRelayAction() public {
         address[] memory targets = new address[](2);
         string[] memory signatures = new string[](2);
         bytes[] memory calldatas = new bytes[](2);

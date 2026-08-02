@@ -394,16 +394,7 @@ contract GovernorDelta is GovernorStorageV3 {
     function relay(address target, uint value, bytes calldata data) external payable returns (bytes memory) {
         require(msg.sender == admin || msg.sender == address(timelock), "GovernorDelta::relay: admin or timelock only");
         (bool success, bytes memory returnData) = target.call{value: value}(data);
-
-        if (!success) {
-            if (returnData.length > 0) {
-                assembly {
-                    revert(add(returnData, 32), mload(returnData))
-                }
-            }
-            revert("GovernorDelta::relay: call reverted");
-        }
-
+        require(success, "GovernorDelta::relay: call reverted");
         return returnData;
     }
 
