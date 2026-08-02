@@ -60,27 +60,38 @@ contract VirtualGovernorTest is BaseGovernorTest {
     function testVirtualDelegatedVoteRevision() public {
         uint delegationExpiry = block.timestamp + 7 days;
 
+        /* ------PRIMARY-DELEGATOR------- */
         vm.startPrank(DELEGATOR_PRIMARY);
         governor.delegate(DELEGATEE_PRIMARY, delegationExpiry);
         vm.stopPrank();
+        /* -------------------------------- */
 
+        /* ------PRIMARY-DELEGATEE------- */
         vm.startPrank(DELEGATEE_PRIMARY);
         uint proposalId = pushMockProposal();
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
         commitDelegation(proposalId, DELEGATOR_PRIMARY, DELEGATEE_PRIMARY);
+        (uint committedAgainstVotes, uint committedForVotes,) = governor.getTally(proposalId);
+        require(committedAgainstVotes == 0);
+        require(committedForVotes == 0);
         governor.castVote(proposalId, 1, "");
         governor.castVote(proposalId, 0, "");
         vm.stopPrank();
+        /* -------------------------------- */
 
+        /* ------ALPHA-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_ALPHA);
         governor.castVote(proposalId, 1, "");
         vm.stopPrank();
+        /* -------------------------------- */
 
+        /* ------BETA-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_BETA);
         governor.castVote(proposalId, 1, "");
         vm.stopPrank();
+        /* -------------------------------- */
 
         vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD + 1);
         governor.queue(proposalId);

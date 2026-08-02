@@ -680,11 +680,11 @@ contract GovernorDelta is GovernorStorageV3 {
         ProposalV2 storage proposal = proposals[proposalId];
         bool virtualized = votingModule.virtualized();
         Ballot storage ballot = virtualized ? proposal.virtualized : proposal.primary;
-        Stake storage stake = stakes[delegator];
+        Stake storage s = stakes[delegator];
         Voucher storage allowance = ballot.allowances[delegatee];
         Record storage record = ballot.records[delegator];
 
-        uint weight = stake.amount; 
+        uint weight = s.amount;
         uint votes = predictedPower(delegator, proposal.endTime);
         uint previousVotes;
         uint previousWeight;
@@ -740,7 +740,7 @@ contract GovernorDelta is GovernorStorageV3 {
             primaryRecord.weight = weight;
         }
 
-        stake.unlockTime = proposal.endTime;
+        s.unlockTime = proposal.endTime;
 
         return votes;
     }

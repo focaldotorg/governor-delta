@@ -258,6 +258,7 @@ contract BaseGovernorTest is Test {
     }
 
     function testVetoVoteIsFinal() public {
+        /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
         approveAndLock(STAKEHOLDER_MAJOR);
         uint proposalId = pushMockProposal();
@@ -270,9 +271,11 @@ contract BaseGovernorTest is Test {
         governor.veto(proposalId);
         governor.castVetoVote(proposalId, 1, "");
 
+        // Veto votes cannot be revised
         vm.expectRevert();
         governor.castVetoVote(proposalId, 0, "");
         vm.stopPrank();
+        /* -------------------------------- */
     }
 
     function testVetoedProposal() public {
