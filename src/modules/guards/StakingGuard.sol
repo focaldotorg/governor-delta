@@ -8,26 +8,23 @@ contract StakingGuard is IProposalGuard {
 
     address public governor;
 
-    address public timelock;
-
     IERC20 public token;
 
-    constructor(address governor_, address timelock_) {
+    constructor(address governor_) {
         governor = governor_;
-        timelock = timelock_;
         token = IGovernorDelta(governor_).canonicalToken();
     } 
 
     function record(address target, uint proposalId) public {
-        require(msg.sender == governor || msg.sender == timelock, "TransferGuard::record: only admin");
+        require(msg.sender == governor, "TransferGuard::record: only admin");
     }
   
     function compare(address target, uint proposalId) public {
-        require(msg.sender == governor || msg.sender == timelock, "TransferGuard::compare: only admin");
-        uint balance = token.balanceOf(governor);
-        uint staked = IGovernorDelta(governor).totalStaked();
+        require(msg.sender == governor, "TransferGuard::compare: only admin");
 
-        if (msg.sender == governor) {
+        if (target == governor) {
+          uint balance = token.balanceOf(governor);
+          uint staked = IGovernorDelta(governor).totalStaked();
           require(balance >= staked, "StakingGuard::compare: cannot expense staked balances");
         } 
     }

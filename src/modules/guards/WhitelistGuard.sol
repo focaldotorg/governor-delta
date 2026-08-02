@@ -15,19 +15,16 @@ contract WhitelistGuard is GuardStorage, IProposalGuard {
 
     address public governor;
 
-    address public timelock;
-
     mapping(address => bool) public whitelist;
 
-    constructor(address governor_, address timelock_, address[] memory targets_) {
+    constructor(address governor_, address[] memory targets_) {
         governor = governor_;
-        timelock = timelock_;
 
         _set(targets_, true);
     } 
 
     function record(address target, uint proposalId) public {
-        require(msg.sender == governor || msg.sender == timelock, "TransferGuard::record: only admin");
+        require(msg.sender == governor, "TransferGuard::record: only admin");
         (address[] memory targets, , ,) = IGovernorDelta(governor).getActions(proposalId);
 
         for (uint8 i = 0; i < targets.length; i++) {
@@ -36,7 +33,7 @@ contract WhitelistGuard is GuardStorage, IProposalGuard {
     }
   
     function compare(address target, uint proposalId) public {
-        require(msg.sender == governor || msg.sender == timelock, "TransferGuard::compare: only admin");
+        require(msg.sender == governor, "TransferGuard::compare: only admin");
     }
   
     function remove(address source) public {

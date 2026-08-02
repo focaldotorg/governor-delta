@@ -96,9 +96,8 @@ contract GovernorDelta is GovernorStorageV3 {
         vetoPeriod = DEFAULT_VETO_PERIOD;
         votingDelay = votingDelay_;
         votingModule = IVotingStrategy(address(new WeightedVotingStrategy(address(this))));
-        address guard = address(new StakingGuard(address(this), timelock_));
         address[] memory defaultPolicy = new address[](1);
-        defaultPolicy[0] = guard;
+        defaultPolicy[0] = address(new StakingGuard(address(this)));
         proposalConfig[0] = Graduated(proposalQuota_, DEFAULT_TIER_0_QUORUM, votingPeriod_, defaultPolicy);
         proposalConfig[1] = Graduated(proposalQuota_, DEFAULT_TIER_1_QUORUM, votingPeriod_, defaultPolicy);
         proposalConfig[2] = Graduated(proposalQuota_, DEFAULT_TIER_2_QUORUM, votingPeriod_, defaultPolicy);
@@ -901,7 +900,7 @@ contract GovernorDelta is GovernorStorageV3 {
 
     function _entryStateChecks(address target, uint proposalId) internal {
         uint8 tier = proposals[proposalId].tier;
-        address[] memory guards  = proposalConfig[tier].guards;
+        address[] memory guards = proposalConfig[tier].guards;
 
         for (uint8 i = 0; i < guards.length; i++) {
             IProposalGuard(guards[i]).record(target, proposalId);
@@ -910,7 +909,7 @@ contract GovernorDelta is GovernorStorageV3 {
 
     function _exitStateChecks(address target, uint proposalId) internal {
         uint8 tier = proposals[proposalId].tier;
-        address[] memory guards  = proposalConfig[tier].guards;
+        address[] memory guards = proposalConfig[tier].guards;
 
         for (uint8 i = 0; i < guards.length; i++) {
             IProposalGuard(guards[i]).compare(target, proposalId);

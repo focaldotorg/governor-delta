@@ -15,19 +15,16 @@ contract FunctionSelectorGuard is GuardStorage, IProposalGuard {
 
     address public governor;
 
-    address public timelock;
-
     mapping(string => bool) public blacklist;
 
-    constructor(address governor_, address timelock_, string[] memory selectors_) {
+    constructor(address governor_, string[] memory selectors_) {
         governor = governor_;
-        timelock = timelock_;
 
         _set(selectors_, true);
     } 
 
     function record(address target, uint proposalId) public {
-        require(msg.sender == governor || msg.sender == timelock, "TransferGuard::record: only admin");
+        require(msg.sender == governor, "TransferGuard::record: only admin");
         (, , string[] memory signatures,) = IGovernorDelta(governor).getActions(proposalId);
 
         for (uint8 i = 0; i < signatures.length; i++) {
@@ -36,7 +33,7 @@ contract FunctionSelectorGuard is GuardStorage, IProposalGuard {
     }
   
     function compare(address target, uint proposalId) public {
-        require(msg.sender == governor || msg.sender == timelock, "TransferGuard::compare: only admin");
+        require(msg.sender == governor, "TransferGuard::compare: only admin");
     }
   
     function remove(string memory selector) public {

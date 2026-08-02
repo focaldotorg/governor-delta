@@ -27,17 +27,14 @@ contract TransferGuard is GuardStorage, IProposalGuard {
 
     address public governor;
 
-    address public timelock;
-
     EnumerableSet.AddressSet private tokens;
 
     mapping(address => Token) public assets;
 
     uint constant public MAX_SET_ENTRIES = 5;
 
-    constructor(address governor_, address timelock_, Token[] memory tokens_) {
+    constructor(address governor_, Token[] memory tokens_) {
         governor = governor_;
-        timelock = timelock_;
 
         _set(tokens_, false);
     } 
@@ -47,7 +44,7 @@ contract TransferGuard is GuardStorage, IProposalGuard {
     }
 
     function record(address target, uint proposalId) public {
-        require(msg.sender == governor || msg.sender == timelock, "TransferGuard::record: only admin");
+        require(msg.sender == governor, "TransferGuard::record: only admin");
         address[] memory entries = tokens.values();
 
         for (uint8 i = 0; i < entries.length; i++) {
@@ -57,7 +54,7 @@ contract TransferGuard is GuardStorage, IProposalGuard {
     }
   
     function compare(address target, uint proposalId) public {
-        require(msg.sender == governor || msg.sender == timelock, "TransferGuard::compare: only admin");
+        require(msg.sender == governor, "TransferGuard::compare: only admin");
         address[] memory entries = tokens.values();
 
         for (uint8 i = 0; i < entries.length; i++) {
