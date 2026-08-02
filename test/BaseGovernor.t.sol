@@ -48,8 +48,8 @@ contract BaseGovernorTest is Test {
         governor = deployGovernor();
         timelock = new RelaxedTimelock(msg.sender, DEFAULT_TIMELOCK_DELAY);
 
-        // @notice Why is ether balances funded from governor, not timelock? 
-        vm.deal(address(governor), 1 ether);
+        // Fund timelock for standard execution; relay tests fund governor explicitly.
+        vm.deal(address(timelock), 1 ether);
         // Distribute assets
         treasuryToken.mint(address(timelock), TREASURY_RESERVE);
         governorToken.mint(STAKEHOLDER_PRIMARY, STAKEHOLDER_MAJOR);
@@ -159,6 +159,9 @@ contract BaseGovernorTest is Test {
     }
 
     function testValidProposal() public {
+        uint timelockBalanceBefore = address(timelock).balance;
+        uint governorBalanceBefore = address(governor).balance;
+
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
         approveAndLock(STAKEHOLDER_MAJOR);
@@ -177,6 +180,54 @@ contract BaseGovernorTest is Test {
         governor.execute(proposalId);
         vm.stopPrank();
         /* -------------------------------- */
+
+        require(address(timelock).balance == timelockBalanceBefore - 1);
+        require(address(governor).balance == governorBalanceBefore);
+    }
+
+    function testRelayAction() public {
+        address[] memory targets = new address[](2);
+        string[] memory signatures = new string[](2);
+        bytes[] memory calldatas = new bytes[](2);
+        uint[] memory values = new uint[](2);
+        uint ethAmount = 0.25 ether;
+        uint tokenAmount = 100 ether;
+
+        vm.deal(address(governor), ethAmount);
+        treasuryToken.mint(address(governor), tokenAmount);
+
+        targets[0] = address(governor);
+        signatures[0] = "relay(address,uint256,bytes)";
+        calldatas[0] = abi.encode(STAKEHOLDER_SECONDARY, ethAmount, bytes(""));
+
+        targets[1] = address(governor);
+        signatures[1] = "relay(address,uint256,bytes)";
+        calldatas[1] =
+            abi.encode(address(treasuryToken), 0, abi.encodeWithSignature("transfer(address,uint256)", STAKEHOLDER_SECONDARY, tokenAmount));
+
+        /* ------PRIMARY-STAKEHOLDER------- */
+        vm.startPrank(STAKEHOLDER_PRIMARY);
+        approveAndLock(STAKEHOLDER_MAJOR);
+        uint proposalId = governor.propose(0, targets, values, signatures, calldatas, "");
+
+        vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
+
+        governor.castVote(proposalId, 1, "");
+
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
+
+        governor.queue(proposalId);
+
+        vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + DEFAULT_VETO_PERIOD + 1);
+
+        governor.execute(proposalId);
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        require(address(STAKEHOLDER_SECONDARY).balance == ethAmount);
+        require(address(governor).balance == 0);
+        require(treasuryToken.balanceOf(STAKEHOLDER_SECONDARY) == tokenAmount);
+        require(treasuryToken.balanceOf(address(governor)) == 0);
     }
 
     function testExpiredProposal() public {
