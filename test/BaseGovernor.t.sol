@@ -257,6 +257,24 @@ contract BaseGovernorTest is Test {
         require(endState == GovernorStorageV1.ProposalState.Executed);
     }
 
+    function testVetoVoteIsFinal() public {
+        vm.startPrank(STAKEHOLDER_PRIMARY);
+        approveAndLock(STAKEHOLDER_MAJOR);
+        uint proposalId = pushMockProposal();
+
+        vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
+        governor.castVote(proposalId, 1, "");
+
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
+        governor.queue(proposalId);
+        governor.veto(proposalId);
+        governor.castVetoVote(proposalId, 1, "");
+
+        vm.expectRevert();
+        governor.castVetoVote(proposalId, 0, "");
+        vm.stopPrank();
+    }
+
     function testVetoedProposal() public {
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
@@ -540,6 +558,15 @@ contract BaseGovernorTest is Test {
         governor.lock(amount);
     }
 
+    function commitDelegation(uint proposalId, address delegator, address delegatee) internal {
+        (, uint expiry) = governor.delegations(delegator);
+        commitDelegation(proposalId, delegator, delegatee, expiry);
+    }
+
+    function commitDelegation(uint proposalId, address delegator, address delegatee, uint expiry) internal {
+        governor.commitVote(proposalId, abi.encode(delegator, delegatee, expiry));
+    }
+
     function pushMockProposal() internal returns (uint) {
         address[] memory targets = new address[](1);
         string[] memory signatures = new string[](1);
@@ -552,7 +579,7 @@ contract BaseGovernorTest is Test {
         calldatas[0] = "";
 
         return governor.propose(0, targets, values, signatures, calldatas, "");
-    }
+      }
 
     function governorDomainSeparator() internal view returns (bytes32) {
         return keccak256(abi.encode(governor.DOMAIN_TYPEHASH(), keccak256(bytes(governor.name())), block.chainid, address(governor)));
