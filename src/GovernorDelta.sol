@@ -408,10 +408,25 @@ contract GovernorDelta is GovernorStorageV3 {
         proposal.executed = true;
 
         for (uint i = 0; i < proposal.targets.length; i++) {
-            timelock.executeTransaction{value: proposal.values[i]}(proposal.targets[i], proposal.values[i], proposal.signatures[i], proposal.calldatas[i], proposal.window);
+            timelock.executeTransaction(proposal.targets[i], proposal.values[i], proposal.signatures[i], proposal.calldatas[i], proposal.window);
         }
 
         emit ProposalExecuted(proposalId);
+    }
+
+    /**
+      * @notice Relays a call from the governor to a target contract
+      * @dev Enables recovery of assets held by the governor via governance
+      * @param target The address to call
+      * @param value The amount of ether to forward with the call
+      * @param data The calldata to forward to the target
+      * @return The raw returndata from the target call
+    **/
+    function relay(address target, uint value, bytes calldata data) external payable returns (bytes memory) {
+        require(msg.sender == address(timelock), "GovernorDelta::relay: timelock only");
+        (bool success, bytes memory returnData) = target.call{value: value}(data);
+        require(success, "GovernorDelta::relay: call reverted");
+        return returnData;
     }
 
     /**
