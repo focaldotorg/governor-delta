@@ -253,6 +253,26 @@ contract GovernorStorageV3 is IGovernor, GovernorStorageV2 {
         uint totalWeight;
         /// @notice Records of ballots for the entire set of voters
         mapping (address => Record) records;
+        /// @notice Delegated voting power committed to each delegatee
+        mapping (address => Voucher) allowances;
+    }
+
+    /// @notice Voting power committed to a delegatee for a proposal
+    struct Voucher {
+        /// @notice Current delegated votes available to the delegatee
+        uint votes;
+        /// @notice Current delegated weight available to the delegatee
+        uint weight;
+        /// @notice Delegated weight included in the delegatee's last vote
+        uint commitedWeight;
+        /// @notice Delegated votes included in the delegatee's last vote
+        uint commitedVotes;
+        /// @notice Support selected for the allowance on a virtual ballot
+        uint8 support;
+        /// @notice Whether the delegatee has cast the allowance
+        bool hasVoted;
+        /// @notice Number of times the allowance has been cast
+        uint castVersion;
     }
 
     /// @notice Proposal voter record
@@ -265,6 +285,16 @@ contract GovernorStorageV3 is IGovernor, GovernorStorageV2 {
         uint votes;
         /// @notice The number of tokens the voter had, which were cast 
         uint weight;
+        /// @notice Whether the record represents a delegated commitment
+        bool committed;
+        /// @notice The delegatee associated with a delegated commitment
+        address delegatee;
+        /// @notice Delegated votes included in the last delegatee cast
+        uint commitedVotes;
+        /// @notice Delegated weight included in the last delegatee cast
+        uint commitedWeight;
+        /// @notice Allowance cast version at the last commitment
+        uint commitVersion;
     }
 
     /// @notice Proposal configuration 
