@@ -5,25 +5,39 @@ import "@interfaces/IGovernorDelta.sol";
 
 contract GuardStorage {
 
+    /// @notice Whitelist addition event 
     event PermitAddress(address indexed target);
 
+    /// @notice Whitelist removal event 
     event OmitAddress(address indexed target);
 
 }
 
 contract WhitelistGuard is GuardStorage, IProposalGuard {
 
+    /// @notice Governor target context address
     address public governor;
 
+    /// @notice Account whitelist address keymap 
     mapping(address => bool) public whitelist;
 
+    /**
+      * @notice Initialisation
+      * @param governor_ Target governor context address
+      * @param targets_ Whitelist address keymap values 
+    **/
     constructor(address governor_, address[] memory targets_) {
         governor = governor_;
 
         _set(targets_, true);
     } 
 
-    function record(address target, uint proposalId) public {
+    /**
+      * @notice Pre execution state snapshot
+      * @param context Target guard context address 
+      * @param proposalId Associated proposal identifier 
+    **/
+    function record(address context, uint proposalId) public {
         require(msg.sender == governor, "TransferGuard::record: only admin");
         (address[] memory targets, , ,) = IGovernorDelta(governor).getActions(proposalId);
 
@@ -31,19 +45,20 @@ contract WhitelistGuard is GuardStorage, IProposalGuard {
             require(whitelist[targets[i]], "WhitelistGuard::record: action call target not whitelisted");
         }
     }
-  
-    function compare(address target, uint proposalId) public {
+ 
+    /**
+      * @notice Post execution state diff
+      * @param context Target guard context address 
+      * @param proposalId Associated proposal identifier 
+    **/
+    function compare(address context, uint proposalId) public {
         require(msg.sender == governor, "TransferGuard::compare: only admin");
     }
-  
-    function remove(address source) public {
-        require(msg.sender == governor, "TransferGuard::remove: only admin");
-        require(whitelist[source], "TransferGuard::remove: not tracked");
-        delete whitelist[source];
 
-        emit OmitAddress(source);
-    }
-
+    /**
+      * @notice Whitelist address addition
+      * @param source Target whitelist address
+    **/
     function add(address source) public {
         require(msg.sender == governor, "TransferGuard::add: only admin");
         require(!whitelist[source], "TransferGuard::add: already tracked");
@@ -52,15 +67,37 @@ contract WhitelistGuard is GuardStorage, IProposalGuard {
         emit PermitAddress(source);
     }
 
-    function overwrite(address[] memory inputs, bool option) public {
+    /**
+      * @notice Whitelist address omission 
+      * @param source Target whitelist address
+    **/
+    function remove(address source) public {
+        require(msg.sender == governor, "TransferGuard::remove: only admin");
+        require(whitelist[source], "TransferGuard::remove: not tracked");
+        delete whitelist[source];
+
+        emit OmitAddress(source);
+    }
+
+    /**
+      * @notice Override indexable keymap storage slots
+      * @param inputs The whitelist address values
+      * @param flag Whitelist boolean value 
+    **/
+    function overwrite(address[] memory inputs, bool flag) public {
         require(msg.sender == governor, "TransferGuard::overwrite: only admin"); 
 
         _set(inputs, option);
     }
 
-    function _set(address[] memory entries, bool flag) internal {
-        for (uint8 i = 0; i < entries.length; i++) {
-            address target = entries[i];
+    /**
+      * @notice Keymap storage setter 
+      * @param inputs The whitelist address values
+      * @param flag Whitelist boolean value 
+    */
+    function _set(address[] memory inputs, bool flag) internal {
+        for (uint8 i = 0; i < inputs.length; i++) {
+            address target = inputs[i];
             whitelist[target] = flag;
 
             if (flag) emit PermitAddress(target);

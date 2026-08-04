@@ -5,25 +5,39 @@ import "@interfaces/IGovernorDelta.sol";
 
 contract GuardStorage {
 
+    /// @notice Selector blacklist addition event 
     event BlacklistSelector(string selector);
 
+    /// @notice Selector whitelist event
     event WhitelistSelector(string selector);
 
 }
 
 contract FunctionSelectorGuard is GuardStorage, IProposalGuard {
 
+    /// @notice Governor target context address
     address public governor;
 
+    /// @notice Blacklist keymap 
     mapping(string => bool) public blacklist;
 
+    /**
+      * @notice Initialisation 
+      * @param governor_ Target governor context address
+      * @param selectors_ Preset blacklist selectors
+    **/
     constructor(address governor_, string[] memory selectors_) {
         governor = governor_;
 
         _set(selectors_, true);
     } 
 
-    function record(address target, uint proposalId) public {
+    /**
+      * @notice Post execution state diff
+      * @param context Target guard context address 
+      * @param proposalId Associated proposal identifier 
+    **/
+    function record(address context, uint proposalId) public {
         require(msg.sender == governor, "TransferGuard::record: only admin");
         (, , string[] memory signatures,) = IGovernorDelta(governor).getActions(proposalId);
 
@@ -31,19 +45,20 @@ contract FunctionSelectorGuard is GuardStorage, IProposalGuard {
             require(!blacklist[signatures[i]], "WhitelistGuard::record: action call signature is blacklisted");
         }
     }
-  
-    function compare(address target, uint proposalId) public {
+
+    /**
+      * @notice Post execution state diff
+      * @param context Target guard context address 
+      * @param proposalId Associated proposal identifier 
+    **/
+    function compare(address context, uint proposalId) public {
         require(msg.sender == governor, "TransferGuard::compare: only admin");
     }
-  
-    function remove(string memory selector) public {
-        require(msg.sender == governor, "TransferGuard::remove: only admin");
-        require(blacklist[selector], "TransferGuard::remove: not tracked");
-        delete blacklist[selector];
-
-        emit WhitelistSelector(selector);
-    }
-
+ 
+    /**
+      * @notice Selector blacklist 
+      * @param selector Target function selector 
+    **/
     function add(string memory selector) public {
         require(msg.sender == governor, "TransferGuard::add: only admin");
         require(!blacklist[selector], "TransferGuard::add: already tracked");
@@ -52,15 +67,49 @@ contract FunctionSelectorGuard is GuardStorage, IProposalGuard {
         emit BlacklistSelector(selector);
     }
 
-    function overwrite(string[] memory selectors, bool option) public {
-        require(msg.sender == governor, "TransferGuard::overwrite: only admin"); 
+    /**
+      * @notice Selector Whitelist 
+      * @param selector Target function selector 
+    **/
+    function remove(string memory selector) public {
+        require(msg.sender == governor, "TransferGuard::remove: only admin");
+        require(blacklist[selector], "TransferGuard::remove: not tracked");
+        delete blacklist[selector];
 
-        _set(selectors, option);
+        emit WhitelistSelector(selector);
     }
 
-    function _set(string[] memory entries, bool flag) internal {
-        for (uint8 i = 0; i < entries.length; i++) {
-            string memory selector = entries[i];
+    /**
+      * @notice Selector blacklist 
+      * @param selector Target function selector 
+    **/
+    function add(string memory selector) public {
+        require(msg.sender == governor, "TransferGuard::add: only admin");
+        require(!blacklist[selector], "TransferGuard::add: already tracked");
+        blacklist[selector] = true;
+
+        emit BlacklistSelector(selector);
+    }
+
+    /**
+      * @notice Override indexable keymap storage slots
+      * @param selector The target function selector values
+      * @param flag Whitelist boolean value 
+    **/
+    function overwrite(string[] memory selectors, bool flag) public {
+        require(msg.sender == governor, "TransferGuard::overwrite: only admin"); 
+
+        _set(selectors, flag);
+    }
+
+    /**
+      * @notice Keymap storage setter 
+      * @param inputs The function selector values
+      * @param flag Blacklist flag boolean value 
+    **/
+    function _set(string[] memory inputs, bool flag) internal {
+        for (uint8 i = 0; i < inputs.length; i++) {
+            string memory selector = inputs[i];
             blacklist[selector] = flag;
 
             if (flag) emit BlacklistSelector(selector);

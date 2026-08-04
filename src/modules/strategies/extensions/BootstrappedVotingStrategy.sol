@@ -5,6 +5,7 @@ import "@interfaces/IBootstrappedVotingStrategy.sol";
 
 abstract contract BootstrappedVotingStrategy is IBootstrappedVotingStrategy {
 
+    /// @notice Maximum range of seed lifetime 
     uint constant public MAX_SEED_TIME = 365 days;
 
     /// @notice Tenure mapping for accounts, acting as a basis 

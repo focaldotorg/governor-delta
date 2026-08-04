@@ -6,6 +6,12 @@ import "@strategies/extensions/BootstrappedVotingStrategy.sol";
 
 contract BootstrappedTenureVotingStrategy is TenureVotingStrategy, BootstrappedVotingStrategy {
 
+    /**
+      * @notice Initialisation
+      * @param governor_ Target governor context address 
+      * @param tranches_ Power multiplier target value array 
+      * @param seeds_ Preallocated power multiplier values 
+    **/
     constructor(address governor_, Tranche[] memory tranches_, Seed[] memory seeds_) 
         TenureVotingStrategy(governor_, tranches_) 
     public {
@@ -22,6 +28,12 @@ contract BootstrappedTenureVotingStrategy is TenureVotingStrategy, BootstrappedV
         }
     }
 
+    /**
+      * @notice Returns the future projected voting power of a given account
+      * @param owner The address to query for
+      * @param timestamp The future time to query the voting power at
+      * @return The future voting power of the account 
+    **/
     function predict(address owner, uint timestamp)   
         override(TenureVotingStrategy, BootstrappedVotingStrategy) 
     public view returns (uint) {

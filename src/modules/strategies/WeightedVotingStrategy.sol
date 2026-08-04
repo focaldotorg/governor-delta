@@ -5,10 +5,15 @@ import "@interfaces/IVotingStrategy.sol";
 
 contract WeightedVotingStrategy is IVotingStrategy {
 
+    /// @notice The minimum setable voting period
     IGovernorDelta public governor;
 
-    constructor(address delta_) {
-        governor = IGovernorDelta(delta_);
+    /**
+      * @notice Initialisation 
+      * @param _governor Target governor context address 
+    **/
+    constructor(address governor_) {
+        governor = IGovernorDelta(governor_);
     }
 
     /**

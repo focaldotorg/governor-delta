@@ -2,9 +2,11 @@ pragma solidity ^0.8.10;
 
 interface IProposalGuard {
 
-  function record(address target, uint proposalId) external;
+    /// @notice Pre execution state snapshot 
+    function record(address context, uint proposalId) external;
 
-  function compare(address target, uint proposalId) external;
+    /// @notice Post execution state diff
+    function compare(address context, uint proposalId) external;
 
 }
 

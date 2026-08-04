@@ -70,10 +70,15 @@ contract GovernorDelta is GovernorStorageV3 {
     /// @notice The EIP-712 typehash for the contract's domain
     bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
 
-    modifier guarded(address target, uint proposalId) {
-        _entryStateChecks(target, proposalId);
+    /**
+      * @notice Arbitary state checks for proposal execution 
+      * @param address Target governor context address (governor || timelock)
+      * @param proposalId The associated proposal identifier 
+    **/
+    modifier guarded(address context, uint proposalId) {
+        _entryStateChecks(context, proposalId);
         _;
-        _exitStateChecks(target, proposalId);
+        _exitStateChecks(context, proposalId);
     } 
 
     /**
@@ -152,6 +157,7 @@ contract GovernorDelta is GovernorStorageV3 {
         if (d.target == owner && block.timestamp < d.expiry)  {
             return votingModule.power(delegator);
         }
+
         return 0;
     }
 
@@ -168,6 +174,7 @@ contract GovernorDelta is GovernorStorageV3 {
         if (d.target == owner && block.timestamp < d.expiry && timestamp <= d.expiry) {
             return votingModule.predict(delegator, timestamp);
         }
+
         return 0;
     }
 
@@ -187,7 +194,7 @@ contract GovernorDelta is GovernorStorageV3 {
     /**
       * @notice Gets the tally for a given proposal
       * @param proposalId the id of proposal
-      * @return The voting tally 
+      * @return Against votes, for votes and abstain votes tally 
     **/
     function getTally(uint proposalId) public view returns (uint, uint, uint) {
         ProposalV2 storage p = proposals[proposalId];
@@ -216,7 +223,8 @@ contract GovernorDelta is GovernorStorageV3 {
 
         if (d.expiry > block.timestamp) {
             return d.expiry == expiry && d.target == delegatee;
-        } 
+        }
+
         return false; 
     }
 
@@ -302,7 +310,8 @@ contract GovernorDelta is GovernorStorageV3 {
         uint256 deltaTime = block.timestamp - s.lastUpdateTime;
         s.lastUpdateTime = block.timestamp;
         s.deltaAmountTime += s.amount * deltaTime;
-        s.deltaAmountTime = s.deltaAmountTime * (s.amount - amount) / s.amount;  
+        uint256 effectiveAmount = (s.amount - amount) / s.amount;
+        s.deltaAmountTime = s.deltaAmountTime * effectiveAmount;  
         s.amount -= amount;
         totalStaked -= amount;
 
@@ -415,7 +424,6 @@ contract GovernorDelta is GovernorStorageV3 {
 
     /**
       * @notice Relays a call from the governor to a target contract
-      * @dev Enables recovery of assets held by the governor via governance
       * @param target The address to call
       * @param value The amount of ether to forward with the call
       * @param data The calldata to forward to the target
@@ -898,29 +906,53 @@ contract GovernorDelta is GovernorStorageV3 {
         emit NewPendingAdmin(oldPendingAdmin, pendingAdmin);
     }
 
-    function _entryStateChecks(address target, uint proposalId) internal {
+    /**
+      * @notice Guard system processing pre execution
+      * @param context Guard calls context address (governor || timelock)
+      * @param proposaId The associated proposal identifier
+    **/
+    function _entryStateChecks(address context, uint proposalId) internal {
         uint8 tier = proposals[proposalId].tier;
         address[] memory guards = proposalConfig[tier].guards;
 
         for (uint8 i = 0; i < guards.length; i++) {
-            IProposalGuard(guards[i]).record(target, proposalId);
+            IProposalGuard(guards[i]).record(context, proposalId);
         }
     }
 
-    function _exitStateChecks(address target, uint proposalId) internal {
+    /**
+      * @notice Guard system processing post execution
+      * @param context Guard calls context address (governor || timelock)
+      * @param proposaId The associated proposal identifier
+    **/
+    function _exitStateChecks(address context, uint proposalId) internal {
         uint8 tier = proposals[proposalId].tier;
         address[] memory guards = proposalConfig[tier].guards;
 
         for (uint8 i = 0; i < guards.length; i++) {
-            IProposalGuard(guards[i]).compare(target, proposalId);
+            IProposalGuard(guards[i]).compare(context, proposalId);
         }
     }
 
+    /**
+      * @notice Generalised timelock transaction processing  
+      * @param target Call target address 
+      * @param value Call transaction value 
+      * @param signature Function selector signature 
+      * @param data Raw calldata value
+      * @param eta Bounded timestamp for execution 
+    **/
     function _queueOrRevert(address target, uint value, string memory signature, bytes memory data, uint eta) internal {
         require(!timelock.queuedTransactions(keccak256(abi.encode(target, value, signature, data, eta))), "GovernorBravo::queueOrRevertInternal: identical proposal action already queued at eta");
         timelock.queueTransaction(target, value, signature, data, eta);
     }
 
+    /**
+      * @notice Delegation state handler
+      * @param delegator Delegating account address 
+      * @param delegatee Delegaton target address
+      * @param expiry Expiration timestamp 
+    **/
     function _moveDelegates(address delegator, address delegatee, uint256 expiry) internal {
         if (delegator != delegatee) {
           delegations[delegator] = Delegate(delegatee, expiry);
@@ -930,6 +962,11 @@ contract GovernorDelta is GovernorStorageV3 {
         }
     }
 
+    /**
+      * @notice Proposal cancellation flag 
+      * @param propospId Associated proposal identifier
+      * @param proposal Storage copy of proposal metadata
+    **/
     function _dropProposal(uint proposalId, ProposalV2 storage proposal) internal {
         proposal.canceled = true;
 
@@ -938,6 +975,10 @@ contract GovernorDelta is GovernorStorageV3 {
         }
     }
 
+    /**
+      * @notice Network context helper
+      * @return Network numerical identifier
+    **/
     function _getChainId() internal view returns (uint) {
         uint chainId;
         assembly { chainId := chainid() }

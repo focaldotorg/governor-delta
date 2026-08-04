@@ -7,16 +7,23 @@ import "@openzeppelin/utils/structs/EnumerableSet.sol";
 contract GuardStorage {
  
     struct Token {
+        /// @notice Shallow copy token context balance 
         uint store;
+        /// @notice Minimum transfer amount per action 
         uint limit;
+        /// @notice Permitted culmative transfer amount 
         uint allowance;
+        /// @notice Target token address  
         address source;
     }
 
+    /// @notice Token policy addition event
     event TokenAdded(address indexed token);
 
+    /// @notice Token policy removal event 
     event TokenRemoved(address indexed token);
 
+    /// @notice Token policy parameter update event
     event TokenUpdated(address indexed token, uint256 limit, uint256 allowance);
 
 }
@@ -25,42 +32,67 @@ contract TransferGuard is GuardStorage, IProposalGuard {
 
     using EnumerableSet for EnumerableSet.AddressSet;
 
+    /// @notice Governor target context address
     address public governor;
 
+    /// @notice Token policy address indexes
     EnumerableSet.AddressSet private tokens;
 
+    /// @notice Token policy keymap  
     mapping(address => Token) public assets;
 
+    /// @notice Maximum token policy count 
     uint constant public MAX_SET_ENTRIES = 5;
 
+    /**
+      * @notice Initialisation 
+      * @param governor_ Target governor context address
+      * @param token_ Preset token policy array
+    **/
     constructor(address governor_, Token[] memory tokens_) {
         governor = governor_;
 
         _set(tokens_, false);
     } 
 
+    /**
+      * @notice Asset inventory helper
+      * @param target Account target address query context
+      * @param token Asset context address  
+      * @param Inventory balance amount 
+    **/
     function inventory(address target, address token) public returns (uint) {
         return token == address(0) ? address(target).balance : IERC20(token).balanceOf(target); 
     }
 
-    function record(address target, uint proposalId) public {
+    /**
+      * @notice Post execution state diff
+      * @param context Target guard context address 
+      * @param proposalId Associated proposal identifier 
+    **/
+    function record(address context, uint proposalId) public {
         require(msg.sender == governor, "TransferGuard::record: only admin");
         address[] memory entries = tokens.values();
 
         for (uint8 i = 0; i < entries.length; i++) {
            address token = entries[i];
-           assets[token].store = inventory(target, token);
+           assets[token].store = inventory(context, token);
         }
     }
-  
-    function compare(address target, uint proposalId) public {
+ 
+    /**
+      * @notice Post execution state diff
+      * @param context Target guard context address 
+      * @param proposalId Associated proposal identifier 
+    **/
+    function compare(address context, uint proposalId) public {
         require(msg.sender == governor, "TransferGuard::compare: only admin");
         address[] memory entries = tokens.values();
 
         for (uint8 i = 0; i < entries.length; i++) {
             address token = entries[i];
             Token storage account = assets[token];
-            uint balance = inventory(target, token);
+            uint balance = inventory(context, token);
 
             if (balance < account.store) {
                 uint delta = account.store - balance;
@@ -72,15 +104,11 @@ contract TransferGuard is GuardStorage, IProposalGuard {
             emit TokenUpdated(token, account.limit, account.allowance);
         }
     }
-  
-    function remove(address token) public {
-        require(msg.sender == governor, "TransferGuard::remove: only admin");
-        require(tokens.remove(token), "TransferGuard::remove: not tracked");
-        delete assets[token];
-
-        emit TokenRemoved(token);
-    }
-
+ 
+    /**
+      * @notice Token policy addition
+      * @param token Target token policy 
+    **/
     function add(Token memory token) public {
         require(msg.sender == governor, "TransferGuard::add: only admin");
         require(tokens.length() + 1 <= MAX_SET_ENTRIES, "TransferGuard::add: max tokens added");
@@ -90,12 +118,33 @@ contract TransferGuard is GuardStorage, IProposalGuard {
         emit TokenAdded(token.source);
     }
 
+    /**
+      * @notice Token policy omission 
+      * @param token Target token policy 
+    **/
+    function remove(address token) public {
+        require(msg.sender == governor, "TransferGuard::remove: only admin");
+        require(tokens.remove(token), "TransferGuard::remove: not tracked");
+        delete assets[token];
+
+        emit TokenRemoved(token);
+    }
+
+    /**
+      * @notice Override indexable keymap storage slots
+      * @param inputs Token policy value array
+    **/
     function overwrite(Token[] memory inputs) public {
         require(msg.sender == governor, "TransferGuard::overwrite: only admin"); 
 
         _set(inputs, true);
     }
 
+    /**
+      * @notice Keymap storage setter 
+      * @param entries Token policy value array
+      * @param onlySet Boolean flag to indicate write context 
+    */
     function _set(Token[] memory entries, bool onlySet) internal {
         require(entries.length <= MAX_SET_ENTRIES, "TransferGuard::overwrite: invalid input");
 
