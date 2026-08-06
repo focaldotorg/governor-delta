@@ -72,7 +72,7 @@ contract GovernorDelta is GovernorStorageV3 {
 
     /**
       * @notice Arbitary state checks for proposal execution 
-      * @param address Target governor context address (governor || timelock)
+      * @param context Target governor context address (governor || timelock)
       * @param proposalId The associated proposal identifier 
     **/
     modifier guarded(address context, uint proposalId) {
@@ -909,7 +909,7 @@ contract GovernorDelta is GovernorStorageV3 {
     /**
       * @notice Guard system processing pre execution
       * @param context Guard calls context address (governor || timelock)
-      * @param proposaId The associated proposal identifier
+      * @param proposalId The associated proposal identifier
     **/
     function _entryStateChecks(address context, uint proposalId) internal {
         uint8 tier = proposals[proposalId].tier;
@@ -923,7 +923,7 @@ contract GovernorDelta is GovernorStorageV3 {
     /**
       * @notice Guard system processing post execution
       * @param context Guard calls context address (governor || timelock)
-      * @param proposaId The associated proposal identifier
+      * @param proposalId The associated proposal identifier
     **/
     function _exitStateChecks(address context, uint proposalId) internal {
         uint8 tier = proposals[proposalId].tier;
@@ -964,7 +964,7 @@ contract GovernorDelta is GovernorStorageV3 {
 
     /**
       * @notice Proposal cancellation flag 
-      * @param propospId Associated proposal identifier
+      * @param proposalId Associated proposal identifier
       * @param proposal Storage copy of proposal metadata
     **/
     function _dropProposal(uint proposalId, ProposalV2 storage proposal) internal {

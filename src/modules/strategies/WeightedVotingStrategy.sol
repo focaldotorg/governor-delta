@@ -10,7 +10,7 @@ contract WeightedVotingStrategy is IVotingStrategy {
 
     /**
       * @notice Initialisation 
-      * @param _governor Target governor context address 
+      * @param governor_ Target governor context address 
     **/
     constructor(address governor_) {
         governor = IGovernorDelta(governor_);

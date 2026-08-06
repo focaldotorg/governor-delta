@@ -195,12 +195,12 @@ contract BaseGovernorTest is Test {
 
         targets[0] = address(governor);
         signatures[0] = "relay(uint256,address,uint256,bytes)";
-        calldatas[0] = abi.encode(1, STAKEHOLDER_SECONDARY, ethAmount, bytes(""));
+        calldatas[0] = abi.encode(2, STAKEHOLDER_SECONDARY, ethAmount, bytes(""));
 
         targets[1] = address(governor);
         signatures[1] = "relay(uint256,address,uint256,bytes)";
         calldatas[1] =
-            abi.encode(1, address(treasuryToken), 0, abi.encodeWithSignature("transfer(address,uint256)", STAKEHOLDER_SECONDARY, tokenAmount));
+            abi.encode(2, address(treasuryToken), 0, abi.encodeWithSignature("transfer(address,uint256)", STAKEHOLDER_SECONDARY, tokenAmount));
 
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);

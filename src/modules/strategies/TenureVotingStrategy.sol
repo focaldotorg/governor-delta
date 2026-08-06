@@ -30,7 +30,7 @@ contract TenureVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrategy {
     /**
       * @notice Initialisation
       * @param governor_ Target governor context address
-      * @param _tranches Power multiplier target value array 
+      * @param tranches_ Power multiplier target value array 
     **/
     constructor(address governor_, Tranche[] memory tranches_) public {
         require(checkTranches(tranches_), "TenureVotingStrategy::checkTranches: invalid config");
