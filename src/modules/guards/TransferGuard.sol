@@ -7,29 +7,32 @@ import "@openzeppelin/utils/structs/EnumerableSet.sol";
 contract GuardStorage {
  
     struct Token {
-        /// @notice Minimum transfer amount per action 
+        /// @notice Shallow copy token context balance  
+        uint store;
+        /// @notice Maximum transfer amount per proposal 
         uint limit;
         /// @notice Permitted culmative transfer amount 
-        uint budget;
+        uint allowance;
         /// @notice Target token address  
         address source;
+        /// @notice Target beneficiary address  
+        address beneficiary;
     }
 
-    struct Store {
-        /// @notice Shallow copy token context balance 
-        uint balance;
-        /// @notice Permitted culmative transfer amount 
-        uint allowance;
-    }
-
-    /// @notice Token policy addition event
+    /// @notice Token set removal event
     event TokenAdded(address indexed token);
 
-    /// @notice Token policy removal event 
+    /// @notice Token set addition event
     event TokenRemoved(address indexed token);
 
+    /// @notice Token policy introduction event
+    event PermitPolicy(address indexed token, address indexed beneficiary);
+
+    /// @notice Token policy omission event 
+    event OmitPolicy(address indexed token, address indexed beneficiary);
+
     /// @notice Token policy parameter update event
-    event TokenUpdated(address indexed token, address indexed context, uint256 limit, uint256 allowance);
+    event PolicyUpdate(address indexed token, address indexed context, uint256 limit, uint256 allowance);
 
 }
 
@@ -40,41 +43,34 @@ contract TransferGuard is GuardStorage, IProposalGuard {
     /// @notice Governor target context address
     address public governor;
 
-    /// @notice Timelock target context address
-    address public timelock;
-
     /// @notice Token policy address indexes
     EnumerableSet.AddressSet private tokens;
 
-    /// @notice Token policy keymap  
-    mapping(address => Token) public assets;
-
-    /// @notice Token context store 
-    mapping(address => mapping(address => Store)) public store; 
+    /// @notice Token address context store 
+    mapping(address => mapping(address => Token)) public policies; 
 
     /// @notice Maximum token policy count 
     uint constant public MAX_SET_ENTRIES = 5;
 
     /**
       * @notice Initialisation 
-      * @param contexts_ Target polic context addresses
+      * @param governor_ Target governor address
       * @param tokens_ Preset token policy array
     **/
-    constructor(address[] memory contexts_, Token[] memory tokens_) {
-        governor = contexts_[0];
+    constructor(address governor_, Token[] memory tokens_) public {
+        governor = governor_;
 
         _set(tokens_, false);
-        _credit(contexts_, tokens_);
     } 
 
     /**
       * @notice Asset inventory helper
-      * @param target Account target address query context
+      * @param context Account context address  
       * @param token Asset context address  
       * @return Inventory balance amount 
     **/
-    function inventory(address target, address token) public returns (uint) {
-        return token == address(0) ? address(target).balance : IERC20(token).balanceOf(target); 
+    function inventory(address context, address token) public view returns (uint) {
+        return token == address(0) ? address(context).balance : IERC20(token).balanceOf(context); 
     }
 
     /**
@@ -82,13 +78,13 @@ contract TransferGuard is GuardStorage, IProposalGuard {
       * @param context Target guard context address 
       * @param proposalId Associated proposal identifier 
     **/
-    function record(address context, uint proposalId) public {
+    function record(address context, uint proposalId) external {
         require(msg.sender == governor, "TransferGuard::record: only admin");
         address[] memory entries = tokens.values();
 
         for (uint8 i = 0; i < entries.length; i++) {
            address token = entries[i];
-           store[token][context].balance = inventory(context, token);
+           policies[token][context].store = inventory(context, token);
         }
     }
  
@@ -97,24 +93,23 @@ contract TransferGuard is GuardStorage, IProposalGuard {
       * @param context Target guard context address 
       * @param proposalId Associated proposal identifier 
     **/
-    function compare(address context, uint proposalId) public {
+    function compare(address context, uint proposalId) external {
         require(msg.sender == governor, "TransferGuard::compare: only admin");
         address[] memory entries = tokens.values();
 
         for (uint8 i = 0; i < entries.length; i++) {
             address token = entries[i];
-            Token storage account = assets[token];
-            Store storage store = store[token][context];
+            Token storage account = policies[token][context];
             uint balance = inventory(context, token);
 
-            if (balance < store.balance) {
-                uint delta = store.balance - balance;
+            if (balance < account.store) {
+                uint delta = account.store - balance;
                 require(delta <= account.limit, "TransferGuard::compare: exceeds limit");
-                require(delta <= store.allowance, "TransferGuard::compare: exceeds allowance");
-                store.allowance -= delta;
-            }
+                require(delta <= account.allowance, "TransferGuard::compare: exceeds allowance");
+                account.allowance -= delta;
 
-            emit TokenUpdated(token, context, account.limit, store.allowance);
+                emit PolicyUpdate(token, context, account.limit, account.allowance);
+            }
         }
     }
  
@@ -122,37 +117,55 @@ contract TransferGuard is GuardStorage, IProposalGuard {
       * @notice Token policy addition
       * @param token Target token policy 
     **/
-    function add(Token memory token) public {
+    function add(Token memory token) external {
         require(msg.sender == governor, "TransferGuard::add: only admin");
-        require(tokens.length() + 1 <= MAX_SET_ENTRIES, "TransferGuard::add: max tokens added");
-        require(tokens.add(token.source), "TransferGuard::add: already tracked");
-        assets[token.source] = token;
+        require(tokens.contains(token.source), "TransferGuard::add: already tracked");
+        policies[token.source][token.beneficiary] = token;
 
-        emit TokenAdded(token.source);
+        emit PermitPolicy(token.source, token.beneficiary);
     }
 
     /**
       * @notice Token policy omission 
-      * @param token Target token policy 
+      * @param token Target token address index
+      * @param context Target context address 
     **/
-    function remove(address token) public {
+    function remove(address token, address context) external {
         require(msg.sender == governor, "TransferGuard::remove: only admin");
-        require(tokens.remove(token), "TransferGuard::remove: not tracked");
-        delete assets[token];
+        delete policies[token][context];
 
-        emit TokenRemoved(token);
+        emit OmitPolicy(token, context);
     }
 
     /**
       * @notice Override indexable keymap storage slots
-      * @param contexts Address contexts value array
       * @param inputs Token policy value array
     **/
-    function overwrite(address[] memory contexts, Token[] memory inputs) public {
+    function overwrite(Token[] memory inputs) external {
         require(msg.sender == governor, "TransferGuard::overwrite: only admin"); 
 
         _set(inputs, true);
-        _credit(contexts, inputs);
+    }
+
+    /**
+      * @notice Token set inclusion 
+      * @param token Target token address 
+    **/
+    function push(address token) external {
+        require(tokens.length() + 1 <= MAX_SET_ENTRIES, "TransferGuard::push: max tokens added");
+        require(tokens.add(token), "TransferGuard::push: token already added");
+
+        emit TokenAdded(token);
+    }
+
+    /**
+      * @notice Token set exclusion 
+      * @param token Target token address 
+    **/
+    function pull(address token) external {
+        require(tokens.remove(token), "TransferGuard::push: token not in set");
+
+        emit TokenRemoved(token);
     }
 
     /**
@@ -161,40 +174,23 @@ contract TransferGuard is GuardStorage, IProposalGuard {
       * @param onlySet Boolean flag to indicate write context 
     */
     function _set(Token[] memory entries, bool onlySet) internal {
-        require(entries.length <= MAX_SET_ENTRIES, "TransferGuard::overwrite: invalid input");
-
         for (uint8 i = 0; i < entries.length; i++) {
             address token = entries[i].source;
+            address context = entries[i].beneficiary;
+            policies[token][context] = entries[i];
 
-            if (onlySet) {
-                require(tokens.contains(token), "TransferGuard::overwrite: token not in set");
+            if (!onlySet) {
+                if (tokens.add(token)) {
+                    require(tokens.length() + 1 <= MAX_SET_ENTRIES, "TransferGuard::_set: exceeds set count");
 
-                emit TokenUpdated(token, address(0), entries[i].limit, entries[i].budget);
+                    emit TokenAdded(token);
+                }
             } else {
-                require(tokens.add(token), "TransferGuard::overwrite: token already in set");
-
-                emit TokenAdded(token);
+                require(tokens.contains(token), "TransferGuard::_set: token not in set");
             }
 
-            assets[token] = entries[i];
+            emit PolicyUpdate(token, context, entries[i].limit, entries[i].allowance);
         } 
-    }
-
-    /**
-      * @notice Credit policy context allowances
-      * @param contexts Address contexts value array
-      * @param entries Token policy value array
-    **/
-    function _credit(address[] memory contexts, Token[] memory entries) internal {
-        require(entries.length <= MAX_SET_ENTRIES, "TransferGuard::overwrite: invalid input");
-
-        for (uint8 i = 0; i < contexts.length; i++) {
-            for (uint8 o = 0; o < entries.length; o++) {
-                address token = entries[o].source;
-                address context = contexts[i];
-                store[token][context].allowance = entries[o].budget;
-            }
-        }
     }
 
 }
