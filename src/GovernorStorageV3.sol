@@ -167,7 +167,6 @@ contract GovernorStorageV3 is IGovernor, GovernorStorageV2 {
     /// @notice The number of staked canonical tokens locked by stakers
     uint public totalStaked; 
 
-
     /// @notice A record of states for signing / validating signatures
     mapping (address => uint) public nonces;
 
@@ -275,6 +274,8 @@ contract GovernorStorageV3 is IGovernor, GovernorStorageV2 {
         uint quorum;
         /// @notice The duration of which a proposal will be active for voting
         uint duration;
+        /// @notice Tier guard module target addresses
+        address[] guards;
     }
 
     /// @notice Possible states that a proposal may be in

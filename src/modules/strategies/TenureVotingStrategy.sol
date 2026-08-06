@@ -6,7 +6,10 @@ import "@interfaces/IVotingStrategy.sol";
 
 contract TenureVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrategy {
 
+    /// @notice Discrete power multiplier values 
     Tranche[] public tranches;
+
+    /// @notice Governor target context  
     IGovernorDelta public governor; 
 
     /// @notice Base multiplier scaling unit 
@@ -24,6 +27,11 @@ contract TenureVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrategy {
     /// @notice Maximum tranche total 
     uint constant public MAX_TRANCHE_COUNT = 10;
 
+    /**
+      * @notice Initialisation
+      * @param governor_ Target governor context address
+      * @param tranches_ Power multiplier target value array 
+    **/
     constructor(address governor_, Tranche[] memory tranches_) public {
         require(checkTranches(tranches_), "TenureVotingStrategy::checkTranches: invalid config");
 
