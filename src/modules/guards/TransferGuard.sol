@@ -7,14 +7,19 @@ import "@openzeppelin/utils/structs/EnumerableSet.sol";
 contract GuardStorage {
  
     struct Token {
-        /// @notice Shallow copy token context balance 
-        uint store;
         /// @notice Minimum transfer amount per action 
         uint limit;
         /// @notice Permitted culmative transfer amount 
-        uint allowance;
+        uint budget;
         /// @notice Target token address  
         address source;
+    }
+
+    struct Store {
+        /// @notice Shallow copy token context balance 
+        uint balance;
+        /// @notice Permitted culmative transfer amount 
+        uint allowance;
     }
 
     /// @notice Token policy addition event
@@ -24,7 +29,7 @@ contract GuardStorage {
     event TokenRemoved(address indexed token);
 
     /// @notice Token policy parameter update event
-    event TokenUpdated(address indexed token, uint256 limit, uint256 allowance);
+    event TokenUpdated(address indexed token, address indexed context, uint256 limit, uint256 allowance);
 
 }
 
@@ -35,31 +40,38 @@ contract TransferGuard is GuardStorage, IProposalGuard {
     /// @notice Governor target context address
     address public governor;
 
+    /// @notice Timelock target context address
+    address public timelock;
+
     /// @notice Token policy address indexes
     EnumerableSet.AddressSet private tokens;
 
     /// @notice Token policy keymap  
     mapping(address => Token) public assets;
 
+    /// @notice Token context store 
+    mapping(address => mapping(address => Store)) public store; 
+
     /// @notice Maximum token policy count 
     uint constant public MAX_SET_ENTRIES = 5;
 
     /**
       * @notice Initialisation 
-      * @param governor_ Target governor context address
-      * @param token_ Preset token policy array
+      * @param contexts_ Target polic context addresses
+      * @param tokens_ Preset token policy array
     **/
-    constructor(address governor_, Token[] memory tokens_) {
-        governor = governor_;
+    constructor(address[] memory contexts_, Token[] memory tokens_) {
+        governor = contexts_[0];
 
         _set(tokens_, false);
+        _credit(contexts_, tokens_);
     } 
 
     /**
       * @notice Asset inventory helper
       * @param target Account target address query context
       * @param token Asset context address  
-      * @param Inventory balance amount 
+      * @return Inventory balance amount 
     **/
     function inventory(address target, address token) public returns (uint) {
         return token == address(0) ? address(target).balance : IERC20(token).balanceOf(target); 
@@ -76,7 +88,7 @@ contract TransferGuard is GuardStorage, IProposalGuard {
 
         for (uint8 i = 0; i < entries.length; i++) {
            address token = entries[i];
-           assets[token].store = inventory(context, token);
+           store[token][context].balance = inventory(context, token);
         }
     }
  
@@ -92,16 +104,17 @@ contract TransferGuard is GuardStorage, IProposalGuard {
         for (uint8 i = 0; i < entries.length; i++) {
             address token = entries[i];
             Token storage account = assets[token];
+            Store storage store = store[token][context];
             uint balance = inventory(context, token);
 
-            if (balance < account.store) {
-                uint delta = account.store - balance;
+            if (balance < store.balance) {
+                uint delta = store.balance - balance;
                 require(delta <= account.limit, "TransferGuard::compare: exceeds limit");
-                require(delta <= account.allowance, "TransferGuard::compare: exceeds allowance");
-                account.allowance -= delta;
+                require(delta <= store.allowance, "TransferGuard::compare: exceeds allowance");
+                store.allowance -= delta;
             }
 
-            emit TokenUpdated(token, account.limit, account.allowance);
+            emit TokenUpdated(token, context, account.limit, store.allowance);
         }
     }
  
@@ -132,12 +145,14 @@ contract TransferGuard is GuardStorage, IProposalGuard {
 
     /**
       * @notice Override indexable keymap storage slots
+      * @param contexts Address contexts value array
       * @param inputs Token policy value array
     **/
-    function overwrite(Token[] memory inputs) public {
+    function overwrite(address[] memory contexts, Token[] memory inputs) public {
         require(msg.sender == governor, "TransferGuard::overwrite: only admin"); 
 
         _set(inputs, true);
+        _credit(contexts, inputs);
     }
 
     /**
@@ -154,7 +169,7 @@ contract TransferGuard is GuardStorage, IProposalGuard {
             if (onlySet) {
                 require(tokens.contains(token), "TransferGuard::overwrite: token not in set");
 
-                emit TokenUpdated(token, entries[i].limit, entries[i].allowance);
+                emit TokenUpdated(token, address(0), entries[i].limit, entries[i].budget);
             } else {
                 require(tokens.add(token), "TransferGuard::overwrite: token already in set");
 
@@ -163,6 +178,23 @@ contract TransferGuard is GuardStorage, IProposalGuard {
 
             assets[token] = entries[i];
         } 
+    }
+
+    /**
+      * @notice Credit policy context allowances
+      * @param contexts Address contexts value array
+      * @param entries Token policy value array
+    **/
+    function _credit(address[] memory contexts, Token[] memory entries) internal {
+        require(entries.length <= MAX_SET_ENTRIES, "TransferGuard::overwrite: invalid input");
+
+        for (uint8 i = 0; i < contexts.length; i++) {
+            for (uint8 o = 0; o < entries.length; o++) {
+                address token = entries[o].source;
+                address context = contexts[i];
+                store[token][context].allowance = entries[o].budget;
+            }
+        }
     }
 
 }

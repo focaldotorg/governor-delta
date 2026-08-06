@@ -80,20 +80,8 @@ contract FunctionSelectorGuard is GuardStorage, IProposalGuard {
     }
 
     /**
-      * @notice Selector blacklist 
-      * @param selector Target function selector 
-    **/
-    function add(string memory selector) public {
-        require(msg.sender == governor, "TransferGuard::add: only admin");
-        require(!blacklist[selector], "TransferGuard::add: already tracked");
-        blacklist[selector] = true;
-
-        emit BlacklistSelector(selector);
-    }
-
-    /**
       * @notice Override indexable keymap storage slots
-      * @param selector The target function selector values
+      * @param selectors The target function selector values
       * @param flag Whitelist boolean value 
     **/
     function overwrite(string[] memory selectors, bool flag) public {

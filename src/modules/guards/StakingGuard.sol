@@ -9,7 +9,7 @@ contract StakingGuard is IProposalGuard {
     /// @notice Governor target context address
     address public governor;
 
-    /// @notice Governing / staking token target context
+    /// @notice Governing token target context
     IERC20 public token;
 
     /**

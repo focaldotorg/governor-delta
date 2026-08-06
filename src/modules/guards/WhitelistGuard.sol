@@ -87,7 +87,7 @@ contract WhitelistGuard is GuardStorage, IProposalGuard {
     function overwrite(address[] memory inputs, bool flag) public {
         require(msg.sender == governor, "TransferGuard::overwrite: only admin"); 
 
-        _set(inputs, option);
+        _set(inputs, flag);
     }
 
     /**
