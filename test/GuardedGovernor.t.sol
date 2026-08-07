@@ -18,17 +18,17 @@ contract GuardedGovernorTest is BaseGovernorTest {
         GovernorStorageV3.Graduated[3] memory config;
         guards.push(address(new StakingGuard(address(governor))));
 
-        // @notice guard policy one configuration
+        // Guard policy one configuration
 
         string[] memory selectorsOne = new string[](7);
         selectorsOne[0] = "_setProposalConfig(Graduated[3])";
         selectorsOne[1] = "_setVotingModule(address)";
         selectorsOne[2] = "_setVetoQuorum(uint256)";
-        // constraint can be bypassed if parameter type uses uint declaration
+        // Constraint can be bypassed if param uses alt uint declaration
         selectorsOne[3] = "_setVetoQuorum(uint)";
         selectorsOne[4] = "_setPendingAdmin(address)";
         selectorsOne[5] = "relay(uint256,address,uint256,bytes)";
-        // constraint can be bypassed if parameter type uses uint declaration 
+        // Constraint can be bypassed if param uses alt uint declaration 
         selectorsOne[6] = "relay(uint,address,uint,bytes)";
         address[] memory contactsOne = new address[](1);
         contactsOne[0] = address(governor);
@@ -37,7 +37,7 @@ contract GuardedGovernorTest is BaseGovernorTest {
         policyOne[1] = address(new WhitelistGuard(address(governor), contactsOne));
         policyOne[2] = address(new FunctionSelectorGuard(address(governor), selectorsOne));
 
-        // @notice guard policy two configuration
+        // Guard policy two configuration
 
         string[] memory selectorsTwo = new string[](5);
         selectorsTwo[0] = "_setProposalConfig(Graduated[3])";
@@ -50,27 +50,28 @@ contract GuardedGovernorTest is BaseGovernorTest {
         contactsTwo[1] = address(governorToken);
         contactsTwo[2] = address(0);
         contactsTwo[3] = address(treasuryToken);
-        GuardStorage.Token[] memory budget = new GuardStorage.Token[](3); 
+        GuardStorage.Token[] memory budget = new GuardStorage.Token[](4); 
         budget[0] = GuardStorage.Token(0, 50 ether, 50 ether, address(0), address(timelock));
         budget[1] = GuardStorage.Token(0, 50 ether, 50 ether, address(0), address(governor));
         budget[2] = GuardStorage.Token(0, 500e18, 1000e18, address(treasuryToken), address(timelock));
+        budget[3] = GuardStorage.Token(0, 100e18, 100e18, address(treasuryToken), address(governor));
         address[] memory policyTwo = new address[](4);
         policyTwo[0] = guards[0];
         policyTwo[1] = address(new TransferGuard(address(governor), budget));
         policyTwo[2] = address(new FunctionSelectorGuard(address(governor), selectorsTwo));
         policyTwo[3] = address(new WhitelistGuard(address(governor), contactsTwo));
 
-        // store transfer guard target for later
+        // Store transfer guard target for later
         guards.push(policyTwo[1]);
 
-        // @notice guard policy three configuration
+        // Guard policy three configuration
       
         address[] memory policyThree = new address[](1);
         policyThree[0] = guards[0];
 
-        config[0] = GovernorStorageV3.Graduated(DEFAULT_TIER_0_QUOTA, DEFAULT_TIER_0_QUORUM, DEFAULT_TIER_0_DURATION, policyOne);
-        config[1] = GovernorStorageV3.Graduated(DEFAULT_TIER_1_QUOTA, DEFAULT_TIER_1_QUORUM, DEFAULT_TIER_1_DURATION, policyTwo);
-        config[2] = GovernorStorageV3.Graduated(DEFAULT_TIER_2_QUOTA, DEFAULT_TIER_2_QUORUM, DEFAULT_TIER_2_DURATION, policyThree);
+        config[0] = GovernorStorageV3.Graduated(DEFAULT_PROPOSAL_QUOTA, DEFAULT_TIER_0_QUORUM, DEFAULT_VOTING_PERIOD, policyOne);
+        config[1] = GovernorStorageV3.Graduated(DEFAULT_PROPOSAL_QUOTA, DEFAULT_TIER_1_QUORUM, DEFAULT_VOTING_PERIOD, policyTwo);
+        config[2] = GovernorStorageV3.Graduated(DEFAULT_PROPOSAL_QUOTA, DEFAULT_TIER_2_QUORUM, DEFAULT_VOTING_PERIOD, policyThree);
 
         /* --------TIMELOCK-------- */
         vm.startPrank(address(timelock));
@@ -99,7 +100,7 @@ contract GuardedGovernorTest is BaseGovernorTest {
         vm.stopPrank();
         /* -------------------------------- */
 
-        vm.warp(block.timestamp + DEFAULT_TIER_0_DURATION);
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
 
         governor.queue(proposalId);
 
@@ -111,7 +112,9 @@ contract GuardedGovernorTest is BaseGovernorTest {
         //////////////////////////////////////////
 
         targets[0] = address(governor);
-        // test that alternative declaration for uint is constraint
+
+        // Test that alt uint declaration for restricted 
+        
         signatures[0] = "_setVetoQuorum(uint)";
         calldatas[0] = abi.encode(10000e18);
 
@@ -125,7 +128,7 @@ contract GuardedGovernorTest is BaseGovernorTest {
         vm.stopPrank();
         /* -------------------------------- */
 
-        vm.warp(block.timestamp + DEFAULT_TIER_0_DURATION);
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
 
         governor.queue(proposalId);
 
@@ -150,7 +153,7 @@ contract GuardedGovernorTest is BaseGovernorTest {
         vm.stopPrank();
         /* -------------------------------- */
 
-        vm.warp(block.timestamp + DEFAULT_TIER_0_DURATION);
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
 
         governor.queue(proposalId);
 
@@ -163,7 +166,7 @@ contract GuardedGovernorTest is BaseGovernorTest {
         vm.deal(address(governor), 50 ether);
         vm.deal(address(timelock), 100 ether);
 
-        // @dev spending with sufficient allowance 
+        // Spending with sufficient allowance 
         
         address[] memory targets = new address[](2);
         string[] memory signatures = new string[](2);
@@ -191,7 +194,7 @@ contract GuardedGovernorTest is BaseGovernorTest {
         vm.stopPrank();
         /* -------------------------------- */
 
-        vm.warp(block.timestamp + DEFAULT_TIER_1_DURATION);
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
 
         governor.queue(proposalId);
 
@@ -199,7 +202,7 @@ contract GuardedGovernorTest is BaseGovernorTest {
 
         governor.execute(proposalId);
 
-        // @dev spending with insufficient allowance 
+        // Spending with insufficient allowance 
 
         /* --------STAKEHOLDER PRIMARY-------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
@@ -211,7 +214,7 @@ contract GuardedGovernorTest is BaseGovernorTest {
         vm.stopPrank();
         /* -------------------------------- */
 
-        vm.warp(block.timestamp + DEFAULT_TIER_1_DURATION);
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
 
         governor.queue(proposalId);
 
@@ -222,7 +225,8 @@ contract GuardedGovernorTest is BaseGovernorTest {
         governor.execute(proposalId);
         //////////////////////////////////////
 
-        // @dev normal spending and updated allowance 
+        // Normal spending and updated allowance 
+        
         GuardStorage.Token[] memory budget = new GuardStorage.Token[](1); 
         budget[0] = GuardStorage.Token(0, 50 ether, 50 ether, address(0), address(timelock));
  
@@ -257,7 +261,7 @@ contract GuardedGovernorTest is BaseGovernorTest {
         vm.stopPrank();
         /* -------------------------------- */
 
-        vm.warp(block.timestamp + DEFAULT_TIER_1_DURATION);
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
 
         governor.queue(proposalId);
 
@@ -265,7 +269,7 @@ contract GuardedGovernorTest is BaseGovernorTest {
 
         governor.execute(proposalId);
 
-        // @dev spending with exceeding policy limit
+        // Spending with exceeding policy limit
 
         /* --------STAKEHOLDER PRIMARY-------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
@@ -277,7 +281,7 @@ contract GuardedGovernorTest is BaseGovernorTest {
         vm.stopPrank();
         /* -------------------------------- */
 
-        vm.warp(block.timestamp + DEFAULT_TIER_1_DURATION);
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
 
         governor.queue(proposalId);
 
@@ -324,14 +328,16 @@ contract GuardedGovernorTest is BaseGovernorTest {
         vm.stopPrank();
         /* -------------------------------- */
 
-        vm.warp(block.timestamp + DEFAULT_TIER_2_DURATION);
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
 
         governor.queue(proposalId);
 
         vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + DEFAULT_VETO_PERIOD + 1);
 
+        /// Cant expense govenror staking allocation
         vm.expectRevert();
         governor.execute(proposalId);
+        ///////////////////////////////////////////
     }
 
     function makeProposal(uint8 tier, address target, string memory signature, bytes memory data, uint value) internal returns (uint) {

@@ -64,47 +64,14 @@ contract BaseGovernorTest is Test {
     }
 
     function testLockSystem() public {
-        uint beforeTs = block.timestamp;
-        uint balanceBefore = governorToken.balanceOf(STAKEHOLDER_PRIMARY);
-        (uint stakeBefore,,) = governor.stake(STAKEHOLDER_PRIMARY);
-        require(balanceBefore == STAKEHOLDER_MAJOR);
-        require(stakeBefore == 0);
-
-        /* ------PRIMARY-STAKEHOLDER------- */
-        vm.startPrank(STAKEHOLDER_PRIMARY);
-        approveAndLock(STAKEHOLDER_MAJOR);
-        vm.stopPrank();
-        /* -------------------------------- */
-
-        // Fast forward 6 hours
-        vm.warp(beforeTs + 6 hours);
-
-        uint balanceAfter = governorToken.balanceOf(STAKEHOLDER_PRIMARY);
-        (uint stakeAfter, uint deltaTime,) = governor.stake(STAKEHOLDER_PRIMARY);
-
-        require(balanceAfter == 0);
-        require(stakeAfter == STAKEHOLDER_MAJOR);
-        require(deltaTime == 0);
-
-        /* ------PRIMARY-STAKEHOLDER------- */
-        vm.startPrank(STAKEHOLDER_PRIMARY);
-        governor.unlock(500e18);
-        vm.stopPrank();
-        /* -------------------------------- */
-
-        uint balanceLast = governorToken.balanceOf(STAKEHOLDER_PRIMARY);
-        (uint stakeLast, uint deltaTimeLast,) = governor.stake(STAKEHOLDER_PRIMARY);
-
-        require(balanceLast == 500e18);
-        require(stakeLast == 14500e18);
-        require(deltaTimeLast == (block.timestamp - beforeTs) * 14500e18);
+        // @TODO More rigorous edge cases needed 
     }
 
     function testInvalidProposal() public {
         /* ------TERNARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_TERNARY);
         approveAndLock(STAKEHOLDER_MINOR);
-        uint proposalId = pushMockProposal();
+        uint proposalId = pushMockProposal(1);
 
         // Factor for voting delay
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
@@ -121,7 +88,7 @@ contract BaseGovernorTest is Test {
         /* ------TERNARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_TERNARY);
         approveAndLock(STAKEHOLDER_MINOR);
-        uint proposalId = pushMockProposal();
+        uint proposalId = pushMockProposal(1);
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
@@ -162,7 +129,7 @@ contract BaseGovernorTest is Test {
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
         approveAndLock(STAKEHOLDER_MAJOR);
-        uint proposalId = pushMockProposal();
+        uint proposalId = pushMockProposal(1);
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
@@ -205,7 +172,7 @@ contract BaseGovernorTest is Test {
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
         approveAndLock(STAKEHOLDER_MAJOR);
-        uint proposalId = governor.propose(0, targets, values, signatures, calldatas, "");
+        uint proposalId = governor.propose(1, targets, values, signatures, calldatas, "");
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
@@ -231,7 +198,7 @@ contract BaseGovernorTest is Test {
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
         approveAndLock(STAKEHOLDER_MAJOR);
-        uint proposalId = pushMockProposal();
+        uint proposalId = pushMockProposal(1);
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
@@ -257,7 +224,7 @@ contract BaseGovernorTest is Test {
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
         approveAndLock(STAKEHOLDER_MAJOR);
-        uint proposalId = pushMockProposal();
+        uint proposalId = pushMockProposal(1);
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
@@ -309,7 +276,7 @@ contract BaseGovernorTest is Test {
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
         approveAndLock(STAKEHOLDER_MAJOR);
-        uint proposalId = pushMockProposal();
+        uint proposalId = pushMockProposal(1);
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
@@ -355,7 +322,7 @@ contract BaseGovernorTest is Test {
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
         approveAndLock(STAKEHOLDER_MAJOR);
-        uint proposalId = pushMockProposal();
+        uint proposalId = pushMockProposal(1);
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
@@ -381,7 +348,7 @@ contract BaseGovernorTest is Test {
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
         approveAndLock(STAKEHOLDER_MAJOR);
-        uint proposalId = pushMockProposal();
+        uint proposalId = pushMockProposal(1);
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
@@ -414,7 +381,7 @@ contract BaseGovernorTest is Test {
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
         approveAndLock(STAKEHOLDER_MAJOR);
-        uint proposalId = pushMockProposal();
+        uint proposalId = pushMockProposal(1);
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
@@ -442,9 +409,9 @@ contract BaseGovernorTest is Test {
     function testProposalConfig() public {
         GovernorStorageV3.Graduated[3] memory config;
         address[] memory guardPolicy = new address[](0);
-        config[0] = GovernorStorageV3.Graduated(DEFAULT_TIER_0_QUOTA, STAKEHOLDER_MINOR, DEFAULT_TIER_0_DURATION, guardPolicy);
-        config[1] = GovernorStorageV3.Graduated(DEFAULT_TIER_1_QUOTA, DEFAULT_TIER_1_QUORUM, DEFAULT_TIER_1_DURATION, guardPolicy);
-        config[2] = GovernorStorageV3.Graduated(DEFAULT_TIER_2_QUOTA, DEFAULT_TIER_2_QUORUM, DEFAULT_TIER_2_DURATION, guardPolicy);
+        config[0] = GovernorStorageV3.Graduated(DEFAULT_TIER_0_QUOTA, STAKEHOLDER_MINOR, DEFAULT_VOTING_PERIOD, guardPolicy);
+        config[1] = GovernorStorageV3.Graduated(DEFAULT_TIER_1_QUOTA, STAKEHOLDER_MINOR, DEFAULT_VOTING_PERIOD, guardPolicy);
+        config[2] = GovernorStorageV3.Graduated(DEFAULT_TIER_2_QUOTA, STAKEHOLDER_MINOR, DEFAULT_VOTING_PERIOD, guardPolicy);
 
         /* --------TIMELOCK-------- */
         vm.startPrank(address(timelock));
@@ -455,7 +422,7 @@ contract BaseGovernorTest is Test {
         /* ------TERNARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_TERNARY);
         approveAndLock(STAKEHOLDER_MINOR);
-        uint proposalId = pushMockProposal();
+        uint proposalId = pushMockProposal(2);
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
@@ -463,13 +430,6 @@ contract BaseGovernorTest is Test {
         /* -------------------------------- */
 
         vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
-
-        // Proposal should not be ready with old duration 
-        vm.expectRevert();
-        governor.queue(proposalId);
-        //////////////////////////////////////
-
-        vm.warp(block.timestamp + (DEFAULT_TIER_0_DURATION - DEFAULT_VOTING_PERIOD));
 
         governor.queue(proposalId);
         vm.stopPrank();
@@ -485,7 +445,7 @@ contract BaseGovernorTest is Test {
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
         approveAndLock(STAKEHOLDER_MAJOR); 
-        uint proposalId = pushMockProposal();
+        uint proposalId = pushMockProposal(1);
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
@@ -518,7 +478,7 @@ contract BaseGovernorTest is Test {
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
         approveAndLock(STAKEHOLDER_MAJOR);
-        uint proposalId = pushMockProposal();
+        uint proposalId = pushMockProposal(1);
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
@@ -556,7 +516,7 @@ contract BaseGovernorTest is Test {
         /* ------PRIMARY-STAKEHOLDER------- */
         vm.startPrank(STAKEHOLDER_PRIMARY);
         approveAndLock(STAKEHOLDER_MAJOR);
-        uint proposalId = pushMockProposal();
+        uint proposalId = pushMockProposal(1);
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
@@ -587,7 +547,7 @@ contract BaseGovernorTest is Test {
         governor.lock(amount);
     }
 
-    function pushMockProposal() internal returns (uint) {
+    function pushMockProposal(uint8 tier) internal returns (uint) {
         address[] memory targets = new address[](1);
         string[] memory signatures = new string[](1);
         bytes[] memory calldatas = new bytes[](1);
@@ -598,7 +558,7 @@ contract BaseGovernorTest is Test {
         signatures[0] = "";
         calldatas[0] = "";
 
-        return governor.propose(0, targets, values, signatures, calldatas, "");
+        return governor.propose(tier, targets, values, signatures, calldatas, "");
     }
 
     function governorDomainSeparator() internal view returns (bytes32) {

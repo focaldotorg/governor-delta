@@ -74,7 +74,7 @@ contract VirtualGovernorTest is BaseGovernorTest {
 
         /* ------PRIMARY-DELEGATEE------- */
         vm.startPrank(DELEGATEE_PRIMARY);
-        uint proposalId = pushMockProposal();
+        uint proposalId = pushMockProposal(1);
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
@@ -164,7 +164,7 @@ contract VirtualGovernorTest is BaseGovernorTest {
 
         /* ------PRIMARY-DELEGATEE------- */
         vm.startPrank(DELEGATEE_PRIMARY);
-        uint proposalId = pushMockProposal();
+        uint proposalId = pushMockProposal(1);
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
@@ -227,7 +227,7 @@ contract VirtualGovernorTest is BaseGovernorTest {
 
         /* ------PRIMARY-DELEGATEE------- */
         vm.startPrank(DELEGATEE_PRIMARY);
-        uint proposalId = pushMockProposal();
+        uint proposalId = pushMockProposal(0);
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
@@ -281,44 +281,58 @@ contract VirtualGovernorTest is BaseGovernorTest {
         uint delegationExpiry = block.timestamp + 7 days;
         uint sigExpiry = block.timestamp + 7 days;
 
+        /* ------DELEGATOR------- */
         vm.startPrank(delegator);
         governorToken.mint(delegator, STAKEHOLDER_MINOR);
         approveAndLock(STAKEHOLDER_MINOR);
         governor.delegate(DELEGATEE_PRIMARY, delegationExpiry);
         vm.stopPrank();
+        /* -------------------------------- */ 
 
+        /* ------PRIMARY-DELEGATEE------- */
         vm.startPrank(DELEGATEE_PRIMARY);
-        uint proposalId = pushMockProposal();
+        uint proposalId = pushMockProposal(1);
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
         governor.castVote(proposalId, 1, "");
         governor.castVirtualVote(proposalId, 1, delegator);
         vm.stopPrank();
+        /* -------------------------------- */ 
 
         bytes32 digest = revocationDigest(DELEGATEE_PRIMARY, delegationExpiry, 0, sigExpiry);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(delegatorPk, digest);
         governor.revokeBySig(DELEGATEE_PRIMARY, delegationExpiry, 0, sigExpiry, v, r, s);
 
+        /* ------STAKEHOLDER_ALPHA------- */
         vm.startPrank(STAKEHOLDER_ALPHA);
         governor.castVote(proposalId, 1, "");
         vm.stopPrank();
+        /* -------------------------------- */ 
 
+        /* ------STAKEHOLDER_BETA------- */
         vm.startPrank(STAKEHOLDER_BETA);
         governor.castVote(proposalId, 1, "");
         vm.stopPrank();
+        /* -------------------------------- */ 
 
+        /* ------STAKEHOLDER_THETA------- */
         vm.startPrank(STAKEHOLDER_THETA);
         governor.castVote(proposalId, 1, "");
         vm.stopPrank();
+        /* -------------------------------- */ 
 
+        /* ------STAKEHOLDER_OMEGA------- */
         vm.startPrank(STAKEHOLDER_OMEGA);
         governor.castVote(proposalId, 1, "");
         vm.stopPrank();
+        /* -------------------------------- */ 
 
+        /* ------STAKEHOLDER_TAU------- */
         vm.startPrank(STAKEHOLDER_TAU);
         governor.castVote(proposalId, 1, "");
         vm.stopPrank();
+        /* -------------------------------- */ 
 
         vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD + 1);
 
@@ -329,8 +343,10 @@ contract VirtualGovernorTest is BaseGovernorTest {
         bytes[] memory votes = new bytes[](1);
         votes[0] = abi.encode(delegator, DELEGATEE_PRIMARY, delegationExpiry);
 
+        // Cant attest votes that have been revoked
         vm.expectRevert();
         governor.batchAttestVotes(proposalId, votes);
+        ////////////////////////////////////////
     }
 
     function setUpScenario() internal {

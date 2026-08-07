@@ -45,7 +45,7 @@ contract CanonicalGovernorTest is BaseGovernorTest {
 
         /* ------PRIMARY-DELEGATEE------- */
         vm.startPrank(DELEGATEE_PRIMARY);
-        uint proposalId = pushMockProposal();
+        uint proposalId = pushMockProposal(1);
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
@@ -79,11 +79,11 @@ contract CanonicalGovernorTest is BaseGovernorTest {
 
         /* ------PRIMARY-DELEGATEE------- */
         vm.startPrank(DELEGATEE_PRIMARY);
-        pushMockProposal();
+        proposalId = pushMockProposal(1);
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
-        governor.castVote(proposalId + 1, 1, "");
+        governor.castVote(proposalId, 1, "");
         // Delegatee cant spend delegation that is no longer active
         vm.expectRevert();
         governor.castVirtualVote(proposalId + 1, 1, DELEGATOR_PRIMARY);
@@ -91,7 +91,7 @@ contract CanonicalGovernorTest is BaseGovernorTest {
         vm.stopPrank();
         /* -------------------------------- */
 
-        (, uint finalVotes,)= governor.getTally(proposalId + 1);
+        (, uint finalVotes,)= governor.getTally(proposalId);
         require(finalVotes == STAKEHOLDER_MINOR);
     }
 
@@ -110,7 +110,7 @@ contract CanonicalGovernorTest is BaseGovernorTest {
 
         /* ------PRIMARY-DELEGATEE------- */
         vm.startPrank(DELEGATEE_PRIMARY);
-        uint proposalId = pushMockProposal();
+        uint proposalId = pushMockProposal(1);
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
@@ -156,7 +156,7 @@ contract CanonicalGovernorTest is BaseGovernorTest {
 
         /* ------PRIMARY-DELEGATEE------- */
         vm.startPrank(DELEGATEE_PRIMARY);
-        uint proposalId = pushMockProposal();
+        uint proposalId = pushMockProposal(1);
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
@@ -371,7 +371,7 @@ contract CanonicalGovernorTest is BaseGovernorTest {
 
         /* ------DELEGATEE------- */
         vm.startPrank(DELEGATEE_PRIMARY);
-        uint proposalId = pushMockProposal();
+        uint proposalId = pushMockProposal(1);
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
@@ -405,7 +405,7 @@ contract CanonicalGovernorTest is BaseGovernorTest {
 
         /* ------PRIMARY-DELEGATEE------- */
         vm.startPrank(DELEGATEE_PRIMARY);
-        uint proposalId = pushMockProposal();
+        uint proposalId = pushMockProposal(1);
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
