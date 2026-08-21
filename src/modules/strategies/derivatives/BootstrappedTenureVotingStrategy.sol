@@ -20,7 +20,6 @@ contract BootstrappedTenureVotingStrategy is TenureVotingStrategy, BootstrappedV
             uint seedValue = seeds_[i].basisTime;
             uint seedTime = seeds_[i].lifeTime;
             require(seedAccount != address(0), "TenureVotingStrategy::init: zero seed address");
-            require(seedValue > 0, "TenureVotingStrategy::init: seed value has to be non-zero");
             require(seedValue >= MULTIPLIER_UNIT, "TenureVotingStrategy::init: seed value lte decimal factor");
             require(seedTime > block.timestamp, "TenureVotingStrategy::init: invalid seed expiration");
             require(seedTime - block.timestamp <= MAX_SEED_TIME, "TenureVotingStrategy::init: invalid seed period");

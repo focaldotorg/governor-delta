@@ -10,6 +10,12 @@ contract GovernorDelta is GovernorStorageV3 {
     /// @notice The name of this contract
     string public constant name = "Governor Delta";
 
+    /// @notice State snapshot opcode 
+    uint8 constant OP_READ = 0;
+
+    /// @notice State compare opcode
+    uint8 constant OP_DIFF = 1;
+
     /// @notice The minimum setable voting period
     uint public constant MIN_VOTING_PERIOD = 3 days;
 
@@ -70,16 +76,17 @@ contract GovernorDelta is GovernorStorageV3 {
     /// @notice The EIP-712 typehash for the contract's domain
     bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
 
+
     /**
-      * @notice Arbitary state checks for proposal execution 
+      * @notice Arbitrary state checks for proposal execution
       * @param context Target governor context address (governor || timelock)
-      * @param proposalId The associated proposal identifier 
+      * @param proposalId The associated proposal identifier
     **/
     modifier guarded(address context, uint proposalId) {
-        _entryStateChecks(context, proposalId);
+        reduceState(OP_READ, context, proposalId);
         _;
-        _exitStateChecks(context, proposalId);
-    } 
+        reduceState(OP_DIFF, context, proposalId);
+    }
 
     /**
       * @notice Used to initialize the contract during delegator constructor
@@ -907,30 +914,21 @@ contract GovernorDelta is GovernorStorageV3 {
     }
 
     /**
-      * @notice Guard system processing pre execution
-      * @param context Guard calls context address (governor || timelock)
-      * @param proposalId The associated proposal identifier
+        * @notice Dispatches proposal state to each configured guard for its phase-specific check
+        * @param slot Execution stage index (0  before, after) 
+        * @param context Call context address (governor || timelock)
+        * @param proposalId The associated proposal identifier
     **/
-    function _entryStateChecks(address context, uint proposalId) internal {
+    function reduceState(uint8 slot, address context, uint proposalId) internal {
         uint8 tier = proposals[proposalId].tier;
         address[] memory guards = proposalConfig[tier].guards;
 
         for (uint8 i = 0; i < guards.length; i++) {
-            IProposalGuard(guards[i]).record(context, proposalId);
-        }
-    }
-
-    /**
-      * @notice Guard system processing post execution
-      * @param context Guard calls context address (governor || timelock)
-      * @param proposalId The associated proposal identifier
-    **/
-    function _exitStateChecks(address context, uint proposalId) internal {
-        uint8 tier = proposals[proposalId].tier;
-        address[] memory guards = proposalConfig[tier].guards;
-
-        for (uint8 i = 0; i < guards.length; i++) {
-            IProposalGuard(guards[i]).compare(context, proposalId);
+            if (slot == OP_READ) {
+                IProposalGuard(guards[i]).record(context, proposalId);
+            } else if (slot == OP_DIFF) {
+                IProposalGuard(guards[i]).compare(context, proposalId);
+            }
         }
     }
 
