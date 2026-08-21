@@ -5,6 +5,8 @@ import "@strategies/WeightedVotingStrategy.sol";
 import "@root/GovernorStorageV3.sol";
 import "@guards/StakingGuard.sol";
 
+/** FOCAL RESEARCH COLLECTIVE © 2026 **/
+
 contract GovernorDelta is GovernorStorageV3 {
 
     /// @notice The name of this contract
