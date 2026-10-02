@@ -1,19 +1,14 @@
 # Governor Delta
 
-## Omissions
+## Changelog
 
-### Whitelisting 
-Replaced by the more broad [Timelock](#timelock) restructuring and possible to implement with the new [Guard System](#guards). 
+* **Omit Whitelisting**: Replaced by the more broad [Timelock](#timelock) restructuring and possible to implement with the new [Guard System](#guards). 
+* **Configuration Immutability**: 
+Bravo predefined all parameters of governance at deployment time, which fundamentally fails to adapt for changing asset supply and stakeholder demographics $^1$
 
-### Configuration Immutability
-Bravo predefined all parameters of governance at deployment time, which fundamentally fails to adapt for changing asset supply and stakeholder demographics. An organisation is never the same as it was last week, a rigid structure not only subjects deployments of Bravo to rigorous thresholds (quotas) and quorums to contest rogue capture but also erodes participation from barriers to entry. Failure to adequately calculate sufficient values, additionally leaves an organisation vulnerable to attack with little means for recourse.
+* **Omit Checkpoints**: Replaced of locking and commiting balances, where stakeholders lock tokens to the contract to signal conviction regressing the need for historic lookups with a checkpoint system $^2$
 
-### Checkpoints
-Now redacted in Bravo from the replacement of locking and commiting balances, where stakeholders lock tokens to the contract to signal conviction regressing the need for historic lookups with a checkpoint system. Which while was designed to combat vote-buying, unironically creates the new issue of proposers exercising voting power they may not still retain. As an adversary can create a malicious proposal, vote and then continue to capitulate the equivalent balance on secondary markets, yet still have their weight meaningfully recorded in the [Ballot](#ballots). A problem that would be only be exacerbated if a group of actors colluded together, Delta is not subject to flaw as proposal require attesting balances until resolution.
-
-### Monotonic Call Authority 
-
-In Bravo the timelock faced an issue in its prior proposal call structure, that caused native account balance stored in the timelock to become unspendable, this is addressed by the introduction of [Relay Proposals](#relay-proposals).
+* **Arbitary Call Context**: In Bravo the timelock faced an issue in its prior proposal call structure, that caused native account balance stored in the timelock to become unspendable, this is addressed by the introduction of [Relay Proposals](#relay-proposals).
 
 ## Configuration
 
@@ -194,3 +189,10 @@ The is the period of which a proposal is pending for execution, and where it can
 ### Vote Attestation
 
 During the [Delay](#delay) and [Veto Periods](#veto-period), virtual votes need to be attested to be included in the final tally as realised "primary" votes. The delegation must be still be active to attest, once attested delegations no longer need to be active if of preference, the attestation counts the virtual votes cast over the course of the proposal voting period as finalised.
+
+
+## Notes 
+
+**[1]** An organisation is never the same as it was last week, a rigid structure not only subjects deployments of Bravo to rigorous thresholds (quotas) and quorums to contest rogue capture but also erodes participation from barriers to entry. Failure to adequately calculate sufficient values, additionally leaves an organisation vulnerable to attack with little means for recourse.
+
+**[2]** Which while was designed to combat vote-buying, unironically creates the new issue of proposers exercising voting power they may not still retain. As an adversary can create a malicious proposal, vote and then continue to capitulate the equivalent balance on secondary markets, yet still have their weight meaningfully recorded in the [Ballot](#ballots). A problem that would be only be exacerbated if a group of actors colluded together, Delta is not subject to flaw as proposal require attesting balances until resolution.
