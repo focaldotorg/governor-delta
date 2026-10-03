@@ -14,6 +14,30 @@ Bravo predefined all parameters of governance at deployment time, which fundamen
 
 * **Deprecated Storage Slots**: Many of the prior storage domain objects and mappings, were labelled as redundant but are not overwritten to not void storage for existing instances. 
 
+## Modules
+
+### Voting
+--------
+Defined as a standard interface under IVotingStrategy.
+
+#### Virtualisation
+
+A voting module is intended to be labelled as "virtual" if it is time-weighted, this is to ensure [Delegations](#delegation) can be recorded within a window as valid.
+
+#### Extensions 
+
+Extensions are standardised feature integrations for voting modules, that either add or modify underlying strategies. The `BootstrappedTenureVotingStrategy` is a example of this, giving deployers the extensbility to set predefined or "seeded" basis voting multiplier values with even expiration control.
+
+### Guards
+--------
+The guard system is a set of modular conditions to predefine before proposal execution, defuned as a standard interface under IProposalGuard. Think of them as preimage checks to make sure the intent of the proposal is met. A basic example is restricting calls to be external or internal, or something more rigorous and set system-wide being a max transfer guard for assets under organisational control.
+
+**record()**  
+Arbitary check that happens before proposal execution.
+
+**compare()**  
+Arbitary check that happens after proposal execution.
+
 ## Configuration
 
 **Canonical token**  
@@ -30,77 +54,6 @@ The definitive and immutable currency of authority, defined at deployment. It re
 **Guards**  
 Organisations inherit `StakedTransferGuard` by default for relay proposals. This guard prevents stakeholder deposits from being transferred when a proposal is processed and is a default immutable policy, that is not recommended to omit.
 
-## Account
-
-**Stake**  
-The canonical token balanced locked under to a voting identity.
-
-**lastUpdateTime**  
-The last timestamp a [Lock](#locking) or [Unlock](#unlocking) was initiated.
-
-**Delegate**  
-A selected account of which voting influence is permitted as apart of [Delegation](#delegation)
-
-**deltaAmountTime**  
-The time-multiplier associated with any account, defined as [Effective Time](#effective-time)
-
-
-### Effective Time
-
-A capital-time integral, known as "effective time" (et. Gosling 2026) $^3$, provides a single metric to effectively balance capital contribution with time. The parameter `deltaAmountTime` is designed to reflect that integral, recording a commitment profile across age and deposit size rather than a single snapshot:
-
-&nbsp;
-```math
-t_{\mathrm{effective}} = \int \mathrm{amount}(t)\,dt
-```
-&nbsp;
-
-Since $amount(t)$ only changes at discrete `lock`/`unlock` events, the integral is computed incrementally as a running sum rather than continuously, every event settles the interval since the last update using the *balance held over that interval*:
-
-&nbsp;
-```math
-\Delta t_{\mathrm{effective}}
-\mathrel{+}= \mathrm{amount} \cdot (\mathrm{now} - \mathrm{lastUpdateTime})
-```
-
-### Locking
-
-Settles effective time up to now against the *prior* balance, then applies the new deposit, new depoists do not retroactively accrue effective time for periods before it existed, it actually dilutes it.
-
-### Unlocking
-
-Settles effective time up to now, then rescales it proportionally to the capital retained:
-
-&nbsp;
-```math
-\Delta t_{\mathrm{effective}} \mathrel{*}= \frac{amount - withdrawn}{amount}
-```
-&nbsp;
-
-When unlocking remainder balances retain their time-weight to not penalise deductions to preserve stakeholder conviction. 
-
-## Modules
-
-### IVotingStrategy
-
-#### Virtualisation
-
-A voting module is intended to be labelled as "virtual" if it is time-weighted, this is to ensure [Delegations](#delegation) can be recorded within a window as valid.
-
-#### Extensions 
-
-Extensions are standardised feature integrations for voting modules, that either add or modify underlying strategies. The `BootstrappedTenureVotingStrategy` is a example of this, giving deployers the extensbility to set predefined or "seeded" basis voting multiplier values with even expiration control.
-
-### IProposalGuard
-
-#### record()
-
-Arbitary check that happens before proposal execution.
-
-#### compare()
-
-Arbitary check that happens after proposal execution.
-
 ## Voting System
 
 ### Primary Votes 
@@ -116,62 +69,33 @@ Virtual power or votes are defined as votes cast by delegation or proxy, under a
 Pre-calculates the final voting power for a participant at proposal execution time. For time-dependent strategies such as `PolycentricVotingStrategy`. Using `projectedPower` gives participants and frontends an accurate projection of influence weight at the moment it matters rather than at the moment of casting.
 
 ### Delegation
-
-#### State
-
+----------
+**State**  
 Delegation by default is disabled, and can be activated for any deployment through `activateDelegation`, although it is irreversible one way state change by design.
 
-#### Identifiers
-
+**Identifiers**  
 Every delegation action produces a `abi.encode(delegator, delgatee, expiry)` bytehash for used for referenced in validation of coalitions post proposal voting period and create provenance for delegation actions.
 
 #### Management
-
-##### Expirations
-
+**Expirations**  
 All delegations are subject to the `MAX_DELEGATION_PERIOD` constraint, this is not allow idle allocation of voting power from delegates.
 
-##### Revocability
-
+**Revocability**  
 In the case of virtualised voting modules, the ability to cancel delegation is available at any time - even admist a proposal where that delegated power has already been cast - this is to factor for the potential inclusion of delegation leasing and enforcing such arrangements on a continuous bilateral pricing model. **If you do not wish to be exposed to delegation market risk, do not activate delegation**. When dealing with no virtualised strategies, you can only revoke an active delegation when it is not cast to an active proposal and is not expired.  
 
-## Proposal System
+## Account
 
-### Status
+**Stake**  
+The canonical token balanced locked under to a voting identity.
 
-Qualified, unqualified, contested, resolved.
+**lastUpdateTime**  
+The last timestamp a [Lock](#locking) or [Unlock](#unlocking) was initiated.
 
-### States
+**Delegate**  
+A selected account of which voting influence is permitted as apart of [Delegation](#delegation)
 
-Active, succeeded, defeated, canceled, executed, expired, queued and the new veto state contested.
-
-### Graduated Proposals
-
-Graduated proposals are configurable hierarchy of proposal labelling by severity, with equivalent quorums and durations to match.
-
-#### Guards
-
-The guard system is a set of modular conditions to predefine before proposal execution, think of them as preimage checks to make sure the intent of the proposal is met. A basic example is restricting calls to be external or internal, or something more rigorous and set system-wide being a max transfer guard for assets under organisational control.
-
-### Relay Actions
-
-Relay proposals shift the target proposals origin to the governor, this is allow asset transfer of tokens and native balances [that could of previously been deemed as unspendable in Bravo](https://github.com/focaldotorg/governor-delta/issues/4). 
-
-### Ballots
-
-#### Pretally 
-
-Prior to the proposal being deemed valid for execution, votes are decoupled by delegated "virtual" balances versus "pure" balances. Attestation is at preference of the voting strategy.
-
-#### Final Tally 
-
-On execution we dismiss the prior results and compute a single value for the tally, since we can claim which [Virtual Votes](#virtual-votes) were attested during the timelock, for default weighted-voting strategies all delegated votes are attested by deafult.
-
-### Veto Mechanism
-
-A mechanism to contest a pending proposal approved for execution at the end of the timelock, here a stakeholder can propose to oppose this change, configurable through the veto quorum and quota options. If the veto reaches quorum, the proposal is dropped if it doesnt it continues to execute.
-
-Veto voting period is only active as long as the timelock it does not extend the timelock duration.
+**deltaAmountTime**  
+The time-multiplier associated with any account, defined as [Effective Time](#effective-time)
 
 ## Timelock
 
@@ -187,9 +111,74 @@ The maximum time a proposal is deemed as valid for execution.
 
 The is the period of which a proposal is pending for execution, and where it can be contested to trigger a veto action, the voting period for the veto proposal only lasts as long as the veto period.
 
-### Vote Attestation
+## Proposal System
+**Status**  
+Qualified, unqualified, contested, resolved.
 
+**States**  
+Active, succeeded, defeated, canceled, executed, expired, queued and the new veto state contested.
+
+### Graduated Proposals
+**Tier**  
+The assigned rank index for proposal storage.
+
+**Guards**  
+Assigned guards for each tier.
+
+### Relay Actions
+Relay proposals shift the target proposals origin to the governor, this is allow asset transfer of tokens and native balances [that could of previously been deemed as unspendable in Bravo](https://github.com/focaldotorg/governor-delta/issues/4). 
+
+### Ballots
+------------
+#### Pretally 
+
+Prior to the proposal being deemed valid for execution, votes are decoupled by delegated "virtual" balances versus "pure" balances. Attestation is at preference of the voting strategy.
+
+#### Final Tally 
+
+On execution we dismiss the prior results and compute a single value for the tally, since we can claim which [Virtual Votes](#virtual-votes) were attested during the timelock, for default weighted-voting strategies all delegated votes are attested by deafult.
+
+### Veto Mechanism
+
+A mechanism to contest a pending proposal approved for execution at the end of the timelock, here a stakeholder can propose to oppose this change, configurable through the veto quorum and quota options. If the veto reaches quorum, the proposal is dropped if it doesnt it continues to execute.
+
+Veto voting period is only active as long as the timelock it does not extend the timelock duration.
+
+### Vote Attestation
 During the [Delay](#delay) and [Veto Periods](#veto-period), virtual votes need to be attested to be included in the final tally as realised "primary" votes. The delegation must be still be active to attest, once attested delegations no longer need to be active if of preference, the attestation counts the virtual votes cast over the course of the proposal voting period as finalised.
+
+## Effective Time
+A capital-time integral, known as "effective time" (et. Gosling 2026) $^3$, provides a single metric to effectively balance capital contribution with time. The parameter `deltaAmountTime` is designed to reflect that integral, recording a commitment profile across age and deposit size rather than a single snapshot:
+
+&nbsp;
+```math
+t_{\mathrm{effective}} = \int \mathrm{amount}(t)\,dt
+```
+&nbsp;
+
+Since $amount(t)$ only changes at discrete `lock`/`unlock` events, the integral is computed incrementally as a running sum rather than continuously, every event settles the interval since the last update using the *balance held over that interval*
+
+### Locking
+
+Settles effective time up to now against the *prior* balance, then applies the new deposit, new depoists do not retroactively accrue effective time for periods before it existed, it actually dilutes it.
+
+&nbsp;
+```math
+\Delta t_{\mathrm{effective}}
+\mathrel{+}= \mathrm{amount} \cdot (\mathrm{now} - \mathrm{lastUpdateTime})
+```
+
+### Unlocking
+
+Settles effective time up to now, then rescales it proportionally to the capital retained:
+
+&nbsp;
+```math
+\Delta t_{\mathrm{effective}} \mathrel{*}= \frac{amount - withdrawn}{amount}
+```
+&nbsp;
+
+When unlocking remainder balances retain their time-weight to not penalise deductions to preserve stakeholder conviction. 
 
 ## Notes 
 
