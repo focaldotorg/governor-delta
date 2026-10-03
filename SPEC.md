@@ -8,7 +8,11 @@ Bravo predefined all parameters of governance at deployment time, which fundamen
 
 * **Omit Checkpoints**: Replaced of locking and commiting balances, where stakeholders lock tokens to the contract to signal conviction regressing the need for historic lookups with a checkpoint system $^2$
 
-* **Arbitary Call Context**: In Bravo the timelock faced an issue in its prior proposal call structure, that caused native account balance stored in the timelock to become unspendable, this is addressed by the introduction of [Relay Proposals](#relay-proposals).
+* **Arbitary Call Context**: Bravo's timelock faced an issue in its prior proposal call structure, that caused native account balance stored in the timelock to become unspendable, this is addressed by the introduction of governor interface [Relay Actions](#relay-actions).
+
+* **Vote Revision**: Prior votes were final given it is dependent of a snapshot system, arbitary voting periods enabled by [Graduated Proposals](#graduated-proposals) need vote amendement to not inhibit stakeholders seeking to excercise additional inventory.
+
+* **Deprecated Storage Slots**: Many of the prior storage domain objects and mappings, were labelled as redundant but are not overwritten to not void storage for existing instances. 
 
 ## Configuration
 
@@ -26,9 +30,24 @@ The definitive and immutable currency of authority, defined at deployment. It re
 **Guards**  
 Organisations inherit `StakedTransferGuard` by default for relay proposals. This guard prevents stakeholder deposits from being transferred when a proposal is processed and is a default immutable policy, that is not recommended to omit.
 
-# Effective Time
+## Account
 
-A capital-time integral, known as "effective time" (et. Gosling 2026), provides a single metric to effectively balance capital contribution with time. The parameter `deltaAmountTime` is designed to reflect that integral, recording a commitment profile across age and deposit size rather than a single snapshot:
+**Stake**  
+The canonical token balanced locked under to a voting identity.
+
+**lastUpdateTime**  
+The last timestamp a [Lock](#locking) or [Unlock](#unlocking) was initiated.
+
+**Delegate**  
+A selected account of which voting influence is permitted as apart of [Delegation](#delegation)
+
+**deltaAmountTime**  
+The time-multiplier associated with any account, defined as [Effective Time](#effective-time)
+
+
+### Effective Time
+
+A capital-time integral, known as "effective time" (et. Gosling 2026) $^3$, provides a single metric to effectively balance capital contribution with time. The parameter `deltaAmountTime` is designed to reflect that integral, recording a commitment profile across age and deposit size rather than a single snapshot:
 
 &nbsp;
 ```math
@@ -43,20 +62,6 @@ Since $amount(t)$ only changes at discrete `lock`/`unlock` events, the integral 
 \Delta t_{\mathrm{effective}}
 \mathrel{+}= \mathrm{amount} \cdot (\mathrm{now} - \mathrm{lastUpdateTime})
 ```
-&nbsp;
-
-Over \(n\) update events between \(t_0\) and the current time, this is equivalent to:
-
-&nbsp;
-```math
-t_{\mathrm{effective}}
-=
-\sum_{i=0}^{n-1}
-\mathrm{amount}_i \cdot (t_{i+1} - t_i)
-```
-&nbsp;
-
-In more formal mathematical terms this can be viewed as a Riemann sum of held balance × time-held, accumulated piecewise at each `lock` or `unlock` call rather than requiring a historical checkpoint lookup. The replacement for Bravo's prior checkpoint system with the benefit of now recording tenure, that can leveraged directly in design of voting modules instead of querying balances at a given discrete time.
 
 ### Locking
 
@@ -88,11 +93,11 @@ Extensions are standardised feature integrations for voting modules, that either
 
 ### IProposalGuard
 
-#### Precheck
+#### record()
 
 Arbitary check that happens before proposal execution.
 
-#### Postcheck
+#### compare()
 
 Arbitary check that happens after proposal execution.
 
@@ -105,10 +110,6 @@ Realised votes cast by stakeholders, where voting power is derived from a single
 ### Virtual Votes
 
 Virtual power or votes are defined as votes cast by delegation or proxy, under a [Virtualised](#virtualisation) voting module. To factor for time-weighting a snapshot of the delegated power must be valid at proposal `endTime`. To prove that the delegation was valid during the proposal voting period, if the voting module is non-virtualised delegations bare to distinction to "virtual" but conform to [Primary Votes](#primary-votes). Virtual votes must be attested to be included in the [Final Tally](#final-tally).
-
-### Proxy Votes
-
-If a stakeholder has voted their primary voting power to a proposal, they're intent of the proposal is recorded, if a stakeholder has active delegations which have not been cast, proxy votes allows a relayer to cast the votes indexed by delegation [Identifier](#identifiers). Once the stakeholder casts their support, it is final, only way to void that is through contesting the proposal to its [Veto Mechanisim](#veto-mechanism).
 
 ### Power prediction
 
@@ -152,7 +153,7 @@ Graduated proposals are configurable hierarchy of proposal labelling by severity
 
 The guard system is a set of modular conditions to predefine before proposal execution, think of them as preimage checks to make sure the intent of the proposal is met. A basic example is restricting calls to be external or internal, or something more rigorous and set system-wide being a max transfer guard for assets under organisational control.
 
-### Relay Proposals
+### Relay Actions
 
 Relay proposals shift the target proposals origin to the governor, this is allow asset transfer of tokens and native balances [that could of previously been deemed as unspendable in Bravo](https://github.com/focaldotorg/governor-delta/issues/4). 
 
@@ -189,7 +190,6 @@ The is the period of which a proposal is pending for execution, and where it can
 ### Vote Attestation
 
 During the [Delay](#delay) and [Veto Periods](#veto-period), virtual votes need to be attested to be included in the final tally as realised "primary" votes. The delegation must be still be active to attest, once attested delegations no longer need to be active if of preference, the attestation counts the virtual votes cast over the course of the proposal voting period as finalised.
-
 
 ## Notes 
 
