@@ -2,17 +2,14 @@
 
 ## Changelog
 
+* **Vote Weighting**: Redacted the immutable weighting for custom [Voting Modules](#modules) enabling diverse voting models
 * **Omit Whitelisting**: Replaced by the more broad [Timelock](#timelock) restructuring and possible to implement with the new [Guard System](#guards). 
-* **Configuration Immutability**: 
-Bravo predefined all parameters of governance at deployment time, which fundamentally fails to adapt for changing asset supply and stakeholder demographics $^1$
-
-* **Omit Checkpoints**: Replaced of locking and commiting balances, where stakeholders lock tokens to the contract to signal conviction regressing the need for historic lookups with a checkpoint system $^2$
-
-* **Arbitary Call Context**: Bravo's timelock faced an issue in its prior proposal call structure, that caused native account balance stored in the timelock to become unspendable, this is addressed by the introduction of governor interface [Relay Actions](#relay-actions).
-
-* **Vote Revision**: Prior votes were final given it is dependent of a snapshot system, arbitary voting periods enabled by [Graduated Proposals](#graduated-proposals) need vote amendement to not inhibit stakeholders seeking to excercise additional inventory.
-
-* **Deprecated Storage Slots**: Many of the prior storage domain objects and mappings, were labelled as redundant but are not overwritten to not void storage for existing instances. 
+* **Configuration Mutability**: 
+Bravo predefined all parameters of governance at deployment time, which fundamentally fails to adapt for changing asset supply and stakeholder demographics [¹](#notes)
+* **Omit Checkpoints**: Replaced of locking and commiting balances, where stakeholders lock tokens to the contract to signal conviction regressing the need for historic lookups with a checkpoint system [²](#notes)
+* **Arbitary Call Context**: Bravo's timelock faced an issue in its prior proposal call structure, that caused native account balance stored in the timelock to become unspendable, this is addressed by the introduction of governor interface [Relay Actions](#relay-actions)
+* **Vote Revision**: Prior votes were final given it is dependent of a snapshot system, arbitary voting periods enabled by [Graduated Proposals](#graduated-proposals) need vote amendement to not inhibit stakeholders seeking to excercise additional inventory
+* **Deprecated Storage Slots**: Many of the prior storage domain objects and mappings, were labelled as redundant but are not overwritten to not void storage for existing instances
 
 ## Modules
 
@@ -62,7 +59,7 @@ Realised votes cast by stakeholders, where voting power is derived from a single
 
 ### Virtual Votes
 
-Virtual power or votes are defined as votes cast by delegation or proxy, under a [Virtualised](#virtualisation) voting module. To factor for time-weighting a snapshot of the delegated power must be valid at proposal `endTime`. To prove that the delegation was valid during the proposal voting period, if the voting module is non-virtualised delegations bare to distinction to "virtual" but conform to [Primary Votes](#primary-votes). Virtual votes must be attested to be included in the [Final Tally](#final-tally).
+Virtual power or votes are defined as votes cast by delegation or proxy, under a [Virtualised](#virtualisation) voting module. To factor for time-weighting a snapshot of the delegated power must be valid at proposal `endTime`. To prove that the delegation was valid during the proposal voting period, if the voting module is non-virtualised delegations bare to distinction to "virtual" but conform to [Primary Votes](#primary-votes). Virtual votes must be attested to be included in the [Tally](#tally).
 
 ### Power prediction
 
@@ -118,6 +115,12 @@ Qualified, unqualified, contested, resolved.
 **States**  
 Active, succeeded, defeated, canceled, executed, expired, queued and the new veto state contested.
 
+<p align="center">
+  <img width="700" alt="proposal-lifecycle" src="https://github.com/user-attachments/assets/fc53769a-9dfa-4a83-9af4-abcbd5d9feac" />
+  <br />
+  <em>Figure 1: Proposal Lifecycle</em>
+</p>
+
 ### Graduated Proposals
 **Tier**  
 The assigned rank index for proposal storage.
@@ -134,7 +137,7 @@ Relay proposals shift the target proposals origin to the governor, this is allow
 
 Prior to the proposal being deemed valid for execution, votes are decoupled by delegated "virtual" balances versus "pure" balances. Attestation is at preference of the voting strategy.
 
-#### Final Tally 
+#### Tally 
 
 On execution we dismiss the prior results and compute a single value for the tally, since we can claim which [Virtual Votes](#virtual-votes) were attested during the timelock, for default weighted-voting strategies all delegated votes are attested by deafult.
 
@@ -148,7 +151,7 @@ Veto voting period is only active as long as the timelock it does not extend the
 During the [Delay](#delay) and [Veto Periods](#veto-period), virtual votes need to be attested to be included in the final tally as realised "primary" votes. The delegation must be still be active to attest, once attested delegations no longer need to be active if of preference, the attestation counts the virtual votes cast over the course of the proposal voting period as finalised.
 
 ## Effective Time
-A capital-time integral, known as "effective time" (et. Gosling 2026) $^3$, provides a single metric to effectively balance capital contribution with time. The parameter `deltaAmountTime` is designed to reflect that integral, recording a commitment profile across age and deposit size rather than a single snapshot:
+A capital-time integral, known as "effective time" proposed by **Gosling (2026)** [³](#notes), provides a single metric to effectively balance capital contribution with time. The parameter `deltaAmountTime` is designed to reflect that integral, recording a commitment profile across age and deposit size rather than a single snapshot:
 
 &nbsp;
 ```math
@@ -185,3 +188,5 @@ When unlocking remainder balances retain their time-weight to not penalise deduc
 **[1]** An organisation is never the same as it was last week, a rigid structure not only subjects deployments of Bravo to rigorous thresholds (quotas) and quorums to contest rogue capture but also erodes participation from barriers to entry. Failure to adequately calculate sufficient values, additionally leaves an organisation vulnerable to attack with little means for recourse.
 
 **[2]** Which while was designed to combat vote-buying, unironically creates the new issue of proposers exercising voting power they may not still retain. As an adversary can create a malicious proposal, vote and then continue to capitulate the equivalent balance on secondary markets, yet still have their weight meaningfully recorded in the [Ballot](#ballots). A problem that would be only be exacerbated if a group of actors colluded together, Delta is not subject to flaw as proposal require attesting balances until resolution.
+
+**[3]** Gosling, _Polycentric Voting_ (2026), Focal Research Collective 
