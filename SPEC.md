@@ -7,8 +7,9 @@
 * **Configuration Mutability**: 
 Bravo predefined all parameters of governance at deployment time, which fundamentally fails to adapt for changing asset supply and stakeholder demographics [¹](#notes)
 * **Omit Checkpoints**: Replaced of locking and commiting balances, where stakeholders lock tokens to the contract to signal conviction regressing the need for historic lookups with a checkpoint system [²](#notes)
-* **Arbitary Call Context**: Bravo's timelock faced an issue in its prior proposal call structure, that caused native account balance stored in the timelock to become unspendable, this is addressed by the introduction of governor interface [Relay Actions](#relay-actions)
+* **Vote Accounting**: Since the introduction of time-weighted voting modules, there is need for attestations when delegated votes are exercised, labelled as the "virtual" tally with attestation then commiting it to the "primary" tally. Non-virtual or weighted voting modules, treats all votes as "primary" as there is no need for attestations
 * **Vote Revision**: Prior votes were final given it is dependent of a snapshot system, arbitary voting periods enabled by [Graduated Proposals](#graduated-proposals) need vote amendement to not inhibit stakeholders seeking to excercise additional inventory
+* **Arbitary Call Context**: Bravo's timelock faced an issue in its prior proposal call structure, that caused native account balance stored in the timelock to become unspendable, this is addressed by the introduction of governor interface [Relay Actions](#relay-actions)
 * **Deprecated Storage Slots**: Many of the prior storage domain objects and mappings, were labelled as redundant but are not overwritten to not void storage for existing instances
 
 ## Modules
@@ -94,26 +95,12 @@ A selected account of which voting influence is permitted as apart of [Delegatio
 **deltaAmountTime**  
 The time-multiplier associated with any account, defined as [Effective Time](#effective-time)
 
-## Timelock
-
-### Delay
-
-This is the default delay required until the proposal can be queued if it is succeeded.
-
-### Grace Period
-
-The maximum time a proposal is deemed as valid for execution.
-
-### Veto Period
-
-The is the period of which a proposal is pending for execution, and where it can be contested to trigger a veto action, the voting period for the veto proposal only lasts as long as the veto period.
-
 ## Proposal System
 **Status**  
-Qualified, unqualified, contested, resolved.
+Qualified, Unqualified, Contested, Resolved.
 
 **States**  
-Active, succeeded, defeated, canceled, executed, expired, queued and the new veto state contested.
+Active, Succeeded, Defeated, Cancelled, Executed, Expired, Queued and the new veto state Contested.
 
 <p align="center">
   <img width="700" alt="proposal-lifecycle" src="https://github.com/user-attachments/assets/fc53769a-9dfa-4a83-9af4-abcbd5d9feac" />
@@ -146,6 +133,26 @@ On execution we dismiss the prior results and compute a single value for the tal
 A mechanism to contest a pending proposal approved for execution at the end of the timelock, here a stakeholder can propose to oppose this change, configurable through the veto quorum and quota options. If the veto reaches quorum, the proposal is dropped if it doesnt it continues to execute.
 
 Veto voting period is only active as long as the timelock it does not extend the timelock duration.
+
+## Timelock
+
+### Delay
+
+This is the default delay required until the proposal can be queued if it is succeeded.
+
+### Grace Period
+
+The maximum time a proposal is deemed as valid for execution.
+
+### Veto Period
+
+The is the period of which a proposal is pending for execution, and where it can be contested to trigger a veto action, the voting period for the veto proposal only lasts as long as the veto period.
+
+<p align="center">
+  <img width="1463" height="368" alt="Screenshot 2026-10-05 at 12 54 41" src="https://github.com/user-attachments/assets/62d47f7e-f71c-47f3-899c-bbfd57951d79" />
+  <br />
+  <em>Figure 2: Proposal Stages</em>
+</p>
 
 ### Vote Attestation
 During the [Delay](#delay) and [Veto Periods](#veto-period), virtual votes need to be attested to be included in the final tally as realised "primary" votes. The delegation must be still be active to attest, once attested delegations no longer need to be active if of preference, the attestation counts the virtual votes cast over the course of the proposal voting period as finalised.
