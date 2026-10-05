@@ -2,6 +2,7 @@ pragma solidity ^0.8.13;
 
 import { ITimeWeightedVotingStrategy } from "@interfaces/ITimeWeightedVotingStrategy.sol";
 import { TenureVotingStrategy } from "@strategies/TenureVotingStrategy.sol";
+import { GovernorStorageV3 } from "@root/GovernorStorageV3.sol";
 import { GovernorAdmin } from "./mock/GovernorAdmin.sol";
 import { BaseGovernorTest } from "./BaseGovernor.t.sol";
 
@@ -57,6 +58,282 @@ contract VirtualGovernorTest is BaseGovernorTest {
         return new GovernorAdmin();
     }
 
+    function testVirtualDelegatedVoteRevision() public {
+        uint delegationExpiry = block.timestamp + 7 days;
+
+        /* ------PRIMARY-DELEGATOR------- */
+        vm.startPrank(DELEGATOR_PRIMARY);
+        governor.delegate(DELEGATEE_PRIMARY, delegationExpiry);
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        /* ------PRIMARY-DELEGATEE------- */
+        vm.startPrank(DELEGATEE_PRIMARY);
+        uint proposalId = pushMockProposal(0);
+        vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        commitDelegation(proposalId, DELEGATOR_PRIMARY, DELEGATEE_PRIMARY, delegationExpiry);
+        (uint committedAgainstVotes, uint committedForVotes,) = governor.getTally(proposalId);
+        require(committedAgainstVotes == 0);
+        require(committedForVotes == 0);
+        GovernorStorageV3.Record[3] memory firstCommitRecords = governor.getRecords(proposalId, DELEGATOR_PRIMARY);
+        require(firstCommitRecords[1].commitVersion == 1);
+
+        /* ------PRIMARY-DELEGATEE------- */
+        vm.prank(DELEGATEE_PRIMARY);
+        governor.castVote(proposalId, 1, "");
+        /* -------------------------------- */
+        (uint firstAgainstVotes, uint firstForVotes,) = governor.getTally(proposalId);
+        require(firstAgainstVotes == 0);
+        require(firstForVotes > 0);
+        (uint firstVirtualAgainstVotes, uint firstVirtualForVotes,) = governor.getVirtualTally(proposalId);
+        require(firstVirtualAgainstVotes == 0);
+        require(firstVirtualForVotes > 0);
+
+        vm.prank(DELEGATEE_PRIMARY);
+        governor.castVote(proposalId, 1, "");
+
+        (uint revisedVirtualAgainstVotes, uint revisedVirtualForVotes,) = governor.getVirtualTally(proposalId);
+        require(revisedVirtualAgainstVotes == 0);
+        require(revisedVirtualForVotes == firstVirtualForVotes);
+
+        // Unchanged voting power cannot be recommitted
+        vm.expectRevert();
+        commitDelegation(proposalId, DELEGATOR_PRIMARY, DELEGATEE_PRIMARY, delegationExpiry);
+
+        /* ------PRIMARY-DELEGATOR------- */
+        vm.startPrank(DELEGATOR_PRIMARY);
+        governorToken.mint(DELEGATOR_PRIMARY, STAKEHOLDER_MINOR);
+        approveAndLock(STAKEHOLDER_MINOR);
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        commitDelegation(proposalId, DELEGATOR_PRIMARY, DELEGATEE_PRIMARY, delegationExpiry);
+        GovernorStorageV3.Record[3] memory secondCommitRecords = governor.getRecords(proposalId, DELEGATOR_PRIMARY);
+        require(secondCommitRecords[1].commitVersion == 2);
+
+        (, uint updatedVirtualForVotes,) = governor.getVirtualTally(proposalId);
+        require(updatedVirtualForVotes > firstVirtualForVotes);
+
+        /* ------PRIMARY-DELEGATEE------- */
+        vm.prank(DELEGATEE_PRIMARY);
+        governor.castVote(proposalId, 0, "");
+        /* -------------------------------- */
+        (uint secondAgainstVotes, uint secondForVotes,) = governor.getTally(proposalId);
+        require(secondAgainstVotes > 0);
+        require(secondForVotes == 0);
+        (uint secondVirtualAgainstVotes, uint secondVirtualForVotes,) = governor.getVirtualTally(proposalId);
+        require(secondVirtualAgainstVotes == updatedVirtualForVotes);
+        require(secondVirtualForVotes == 0);
+
+        /* ------ALPHA-STAKEHOLDER------- */
+        vm.startPrank(STAKEHOLDER_ALPHA);
+        governor.castVote(proposalId, 1, "");
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        /* ------BETA-STAKEHOLDER------- */
+        vm.startPrank(STAKEHOLDER_BETA);
+        governor.castVote(proposalId, 1, "");
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD + 1);
+        governor.queue(proposalId);
+        vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + 1);
+
+        bytes[] memory delegateIds = new bytes[](1);
+        delegateIds[0] = abi.encode(DELEGATOR_PRIMARY, DELEGATEE_PRIMARY, delegationExpiry);
+        governor.batchAttestVotes(proposalId, delegateIds);
+
+        GovernorStorageV3.Record[3] memory delegatorRecords = governor.getRecords(proposalId, DELEGATOR_PRIMARY);
+        (uint finalAgainstVotes,,) = governor.getTally(proposalId);
+        require(finalAgainstVotes == secondAgainstVotes + delegatorRecords[1].votes);
+    }
+
+    function testVirtualDelegationToUnstakedDelegatee() public {
+        address delegatee = address(0xBEEF);
+        uint delegationExpiry = block.timestamp + 7 days;
+
+        /* ------PRIMARY-DELEGATOR------- */
+        vm.prank(DELEGATOR_PRIMARY);
+        governor.delegate(delegatee, delegationExpiry);
+        /* -------------------------------- */
+
+        /* ------ALPHA-STAKEHOLDER------- */
+        vm.prank(STAKEHOLDER_ALPHA);
+        uint proposalId = pushMockProposal(0);
+        /* -------------------------------- */
+
+        vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
+
+        /* ------UNSTAKED-DELEGATEE------- */
+        vm.prank(delegatee);
+        governor.castVote(proposalId, 1, "");
+        /* -------------------------------- */
+
+        GovernorStorageV3.Record[3] memory delegateeRecords = governor.getRecords(proposalId, delegatee);
+        require(delegateeRecords[0].hasVoted);
+        require(delegateeRecords[0].votes == 0);
+        require(delegateeRecords[0].weight == 0);
+
+        commitDelegation(proposalId, DELEGATOR_PRIMARY, delegatee, delegationExpiry);
+        (, uint committedVirtualForVotes,) = governor.getVirtualTally(proposalId);
+        require(committedVirtualForVotes > 0);
+
+        /* ------ALPHA-STAKEHOLDER------- */
+        vm.prank(STAKEHOLDER_ALPHA);
+        governor.castVote(proposalId, 1, "");
+        /* -------------------------------- */
+
+        /* ------BETA-STAKEHOLDER------- */
+        vm.prank(STAKEHOLDER_BETA);
+        governor.castVote(proposalId, 1, "");
+        /* -------------------------------- */
+
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD + 1);
+        governor.queue(proposalId);
+        vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + 1);
+
+        GovernorStorageV3.Record[3] memory delegatorRecords = governor.getRecords(proposalId, DELEGATOR_PRIMARY);
+        (, uint priorForVotes,) = governor.getTally(proposalId);
+
+        bytes[] memory delegateIds = new bytes[](1);
+        delegateIds[0] = abi.encode(DELEGATOR_PRIMARY, delegatee, delegationExpiry);
+        governor.batchAttestVotes(proposalId, delegateIds);
+
+        (, uint finalForVotes,) = governor.getTally(proposalId);
+        require(finalForVotes == priorForVotes + delegatorRecords[1].votes);
+    }
+
+    function testAttestationRequiresDirectDelegateeVote() public {
+        uint delegationExpiry = block.timestamp + 7 days;
+
+        vm.prank(DELEGATOR_PRIMARY);
+        governor.delegate(DELEGATEE_PRIMARY, delegationExpiry);
+
+        vm.prank(DELEGATOR_SECONDARY);
+        governor.delegate(DELEGATOR_PRIMARY, delegationExpiry);
+
+        vm.prank(DELEGATEE_PRIMARY);
+        uint proposalId = pushMockProposal(0);
+        vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
+
+        commitDelegation(proposalId, DELEGATOR_PRIMARY, DELEGATEE_PRIMARY, delegationExpiry);
+        commitDelegation(proposalId, DELEGATOR_SECONDARY, DELEGATOR_PRIMARY, delegationExpiry);
+
+        vm.prank(DELEGATEE_PRIMARY);
+        governor.castVote(proposalId, 1, "");
+        vm.prank(STAKEHOLDER_ALPHA);
+        governor.castVote(proposalId, 1, "");
+        vm.prank(STAKEHOLDER_BETA);
+        governor.castVote(proposalId, 1, "");
+
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD + 1);
+        governor.queue(proposalId);
+        vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + 1);
+
+        bytes[] memory delegateIds = new bytes[](1);
+        delegateIds[0] = abi.encode(DELEGATOR_PRIMARY, DELEGATEE_PRIMARY, delegationExpiry);
+        governor.batchAttestVotes(proposalId, delegateIds);
+
+        GovernorStorageV3.Record[3] memory records = governor.getRecords(proposalId, DELEGATOR_PRIMARY);
+        require(records[0].delegatee == DELEGATEE_PRIMARY);
+
+        delegateIds[0] = abi.encode(DELEGATOR_SECONDARY, DELEGATOR_PRIMARY, delegationExpiry);
+        vm.expectRevert();
+        governor.batchAttestVotes(proposalId, delegateIds);
+    }
+
+    function testVirtualDelegationRedirect() public {
+        uint primaryExpiry = block.timestamp + 7 days;
+
+        /* ------PRIMARY-DELEGATOR------- */
+        vm.prank(DELEGATOR_PRIMARY);
+        governor.delegate(DELEGATEE_PRIMARY, primaryExpiry);
+        /* -------------------------------- */
+
+        /* ------PRIMARY-DELEGATEE------- */
+        vm.startPrank(DELEGATEE_PRIMARY);
+        uint proposalId = pushMockProposal(0);
+        vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        commitDelegation(proposalId, DELEGATOR_PRIMARY, DELEGATEE_PRIMARY, primaryExpiry);
+
+        /* ------PRIMARY-DELEGATEE------- */
+        vm.prank(DELEGATEE_PRIMARY);
+        governor.castVote(proposalId, 1, "");
+        /* -------------------------------- */
+
+        (, uint primaryVirtualForVotes,) = governor.getVirtualTally(proposalId);
+        require(primaryVirtualForVotes > 0);
+
+        /* ------PRIMARY-DELEGATOR------- */
+        vm.prank(DELEGATOR_PRIMARY);
+        governor.revoke();
+        /* -------------------------------- */
+
+        vm.warp(block.timestamp + 1);
+        uint secondaryExpiry = block.timestamp + 7 days;
+
+        /* ------PRIMARY-DELEGATOR------- */
+        vm.prank(DELEGATOR_PRIMARY);
+        governor.delegate(DELEGATEE_SECONDARY, secondaryExpiry);
+        /* -------------------------------- */
+
+        commitDelegation(proposalId, DELEGATOR_PRIMARY, DELEGATEE_SECONDARY, secondaryExpiry);
+        GovernorStorageV3.Record[3] memory redirectedRecords = governor.getRecords(proposalId, DELEGATOR_PRIMARY);
+        require(redirectedRecords[1].delegatee == DELEGATEE_SECONDARY);
+        require(redirectedRecords[1].commitVersion == 2);
+
+        (uint redirectedVirtualAgainstVotes, uint redirectedVirtualForVotes,) = governor.getVirtualTally(proposalId);
+        require(redirectedVirtualAgainstVotes == 0);
+        require(redirectedVirtualForVotes == 0);
+
+        /* ------SECONDARY-DELEGATEE------- */
+        vm.prank(DELEGATEE_SECONDARY);
+        governor.castVote(proposalId, 0, "");
+        /* -------------------------------- */
+
+        (uint secondaryVirtualAgainstVotes, uint secondaryVirtualForVotes,) = governor.getVirtualTally(proposalId);
+        require(secondaryVirtualAgainstVotes == primaryVirtualForVotes);
+        require(secondaryVirtualForVotes == 0);
+
+        /* ------ALPHA-STAKEHOLDER------- */
+        vm.prank(STAKEHOLDER_ALPHA);
+        governor.castVote(proposalId, 1, "");
+        /* -------------------------------- */
+
+        /* ------BETA-STAKEHOLDER------- */
+        vm.prank(STAKEHOLDER_BETA);
+        governor.castVote(proposalId, 1, "");
+        /* -------------------------------- */
+
+        vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD + 1);
+        governor.queue(proposalId);
+        vm.warp(block.timestamp + DEFAULT_TIMELOCK_DELAY + 1);
+
+        bytes[] memory delegateIds = new bytes[](1);
+        delegateIds[0] = abi.encode(DELEGATOR_PRIMARY, DELEGATEE_PRIMARY, primaryExpiry);
+        // Prior delegation cannot be attested after redirect
+        vm.expectRevert();
+        governor.batchAttestVotes(proposalId, delegateIds);
+
+        GovernorStorageV3.Record[3] memory delegatorRecords = governor.getRecords(proposalId, DELEGATOR_PRIMARY);
+        (uint priorAgainstVotes, uint priorForVotes,) = governor.getTally(proposalId);
+
+        delegateIds[0] = abi.encode(DELEGATOR_PRIMARY, DELEGATEE_SECONDARY, secondaryExpiry);
+        governor.batchAttestVotes(proposalId, delegateIds);
+
+        (uint finalAgainstVotes, uint finalForVotes,) = governor.getTally(proposalId);
+        require(finalAgainstVotes == priorAgainstVotes + delegatorRecords[1].votes);
+        require(finalForVotes == priorForVotes);
+    }
+
     function testDelegate() public {
         /* ------PRIMARY-DELEGATOR------- */
         vm.startPrank(DELEGATOR_PRIMARY);
@@ -78,8 +355,8 @@ contract VirtualGovernorTest is BaseGovernorTest {
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
+        commitDelegation(proposalId, DELEGATOR_PRIMARY, DELEGATEE_PRIMARY);
         governor.castVote(proposalId, 0, "");
-        governor.castVirtualVote(proposalId, 0, DELEGATOR_PRIMARY);
         vm.stopPrank();
         /* -------------------------------- */
 
@@ -88,7 +365,7 @@ contract VirtualGovernorTest is BaseGovernorTest {
         governor.castVote(proposalId, 0, "");
         // Try cast expired virtual weight
         vm.expectRevert();
-        governor.castVirtualVote(proposalId, 0, DELEGATOR_SECONDARY);
+        commitDelegation(proposalId, DELEGATOR_SECONDARY, DELEGATEE_SECONDARY, secondaryTs);
         //////////////////////////////////////
         vm.stopPrank();
         /* -------------------------------- */
@@ -168,8 +445,8 @@ contract VirtualGovernorTest is BaseGovernorTest {
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
+        commitDelegation(proposalId, DELEGATOR_PRIMARY, DELEGATEE_PRIMARY);
         governor.castVote(proposalId, 1, "");
-        governor.castVirtualVote(proposalId, 1, DELEGATOR_PRIMARY);
         vm.stopPrank();
         /* -------------------------------- */
 
@@ -231,8 +508,8 @@ contract VirtualGovernorTest is BaseGovernorTest {
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
+        commitDelegation(proposalId, DELEGATOR_PRIMARY, DELEGATEE_PRIMARY);
         governor.castVote(proposalId, 1, "");
-        governor.castVirtualVote(proposalId, 1, DELEGATOR_PRIMARY);
         vm.stopPrank();
         /* -------------------------------- */
 
@@ -295,8 +572,8 @@ contract VirtualGovernorTest is BaseGovernorTest {
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
+        commitDelegation(proposalId, delegator, DELEGATEE_PRIMARY);
         governor.castVote(proposalId, 1, "");
-        governor.castVirtualVote(proposalId, 1, delegator);
         vm.stopPrank();
         /* -------------------------------- */ 
 
