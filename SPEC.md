@@ -28,13 +28,15 @@ Extensions are standardised feature integrations for voting modules, that either
 
 ### Guards
 --------
-The guard system is a set of modular conditions to predefine before proposal execution, defuned as a standard interface under IProposalGuard. Think of them as preimage checks to make sure the intent of the proposal is met. A basic example is restricting calls to be external or internal, or something more rigorous and set system-wide being a max transfer guard for assets under organisational control.
+The guard system is a set of modular conditions to predefine before proposal execution, defuned as a standard interface under IProposalGuard. Think of them as preimage checks to make sure the intent of the proposal is met.
 
-**record()**  
-Arbitary check that happens before proposal execution.
+<p align="center">
+  <img width="700" alt="Screenshot 2026-10-05 at 14 49 37" src="https://github.com/user-attachments/assets/757cb347-9a4d-4ed6-bae3-ca4c479727ed" /> 
+  <br />
+  <em>Figure 1: Guard Process</em>
+</p>
 
-**compare()**  
-Arbitary check that happens after proposal execution.
+ A basic example is restricting calls to be external or internal, or something more rigorous and set system-wide being a max transfer guard for assets under organisational control.
 
 ## Configuration
 
@@ -105,7 +107,7 @@ Active, Succeeded, Defeated, Cancelled, Executed, Expired, Queued and the new ve
 <p align="center">
   <img width="700" alt="proposal-lifecycle" src="https://github.com/user-attachments/assets/fc53769a-9dfa-4a83-9af4-abcbd5d9feac" />
   <br />
-  <em>Figure 1: Proposal Lifecycle</em>
+  <em>Figure 2: Proposal Lifecycle</em>
 </p>
 
 ### Graduated Proposals
@@ -151,7 +153,7 @@ The is the period of which a proposal is pending for execution, and where it can
 <p align="center">
   <img width="1463" height="368" alt="Screenshot 2026-10-05 at 12 54 41" src="https://github.com/user-attachments/assets/62d47f7e-f71c-47f3-899c-bbfd57951d79" />
   <br />
-  <em>Figure 2: Proposal Stages</em>
+  <em>Figure 3: Proposal Stages</em>
 </p>
 
 ### Vote Attestation
