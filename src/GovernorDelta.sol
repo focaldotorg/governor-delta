@@ -64,7 +64,7 @@ contract GovernorDelta is GovernorStorageV3 {
     uint public constant MAX_PROPOSAL_OPERATIONS = 10; 
 
     /// @notice The EIP-712 typehash for the vote struct used by the contract
-    bytes32 public constant VOTE_TYPEHASH = keccak256("Vote(uint256 proposalId,uint8 support)");
+    bytes32 public constant VOTE_TYPEHASH = keccak256("Vote(uint256 proposalId,uint8 support,uint256 castVersion)");
 
     /// @notice The EIP-712 typehash for the veto struct used by the contract
     bytes32 public constant VETO_TYPEHASH = keccak256("VetoVote(uint256 proposalId,uint8 support)");
@@ -219,6 +219,17 @@ contract GovernorDelta is GovernorStorageV3 {
     function getRecords(uint proposalId, address voter) public view returns (Record[3] memory) {
         ProposalV2 storage p = proposals[proposalId];
         return [p.primary.records[voter], p.virtualized.records[voter], p.veto.records[voter]]; 
+    }
+
+    /**
+      * @notice Gets a delegatee's allowance for a proposal
+      * @param proposalId The id of the proposal
+      * @param delegatee The address receiving delegated voting power
+      * @return Allowance votes, weight and current cast version
+    **/
+    function getAllowance(uint proposalId, address delegatee) public view returns (uint, uint, uint) {
+        Voucher storage allowance = proposals[proposalId].allowances[delegatee];
+        return (allowance.votes, allowance.weight, allowance.castVersion);
     }
 
     /**
@@ -504,19 +515,22 @@ contract GovernorDelta is GovernorStorageV3 {
     }
 
     /**
-      * @notice Cast a virtual vote on behalf of a delegator
-      * @dev Commits delegated voting power to the virtualized ballot
-      * @param proposalId The id of the proposal to vote on
-      * @param support The support value for the vote. 0=against, 1=for, 2=abstain
-      * @param delegator The address whose delegated power is being committed
+      * @notice Commits delegated voting power to a proposal allowance
+      * @dev New voting power follows the delegatee's existing proposal intent, when present
+      * @param proposalId The id of the proposal to commit voting power to
+      * @param delegateId The delegation identifier to commit
     **/
-    function castVirtualVote(uint proposalId, uint8 support, address delegator) public {
-        require(delegationActive, "GovernorDelta::castVirtualVote: delegation not active");
-        require(state(proposalId) == ProposalState.Active, "GovernorDelta::castVirtualVote: voting is closed");
-        require(delegatedPower(msg.sender, delegator) > 0, "GovernorDelta::castVirtualVote: no delegated power");
-        uint votes = _commitVote(delegator, proposalId, support);
+    function commitVote(uint proposalId, bytes memory delegateId) public {
+        require(delegationActive, "GovernorDelta::commitVote: delegation not active");
+        require(state(proposalId) == ProposalState.Active, "GovernorDelta::commitVote: voting is closed");
+        require(checkDelegation(delegateId), "GovernorDelta::commitVote: delegation invalid");
 
-        emit VoteCast(msg.sender, proposalId, support, votes, "");
+        (address delegator, address delegatee,) = abi.decode(delegateId, (address, address, uint256));
+        require(delegatedPower(delegatee, delegator) > 0, "GovernorDelta::commitVote: no delegated power");
+
+        uint votes = _commitVote(delegator, delegatee, proposalId);
+
+        emit VoteCommitted(proposalId, delegator, delegatee, votes, keccak256(delegateId));
     }
 
     /**
@@ -539,16 +553,18 @@ contract GovernorDelta is GovernorStorageV3 {
       * @dev Accepts EIP-712 signatures for voting, enabling cold storage and gasless voting via relayers
       * @param proposalId The id of the proposal to vote on
       * @param support The support value for the vote. 0=against, 1=for, 2=abstain
+      * @param castVersion The current number of votes cast by the signatory on the proposal
       * @param v The recovery byte of the signature
       * @param r Output of the ECDSA signature pair
       * @param s Output of the ECDSA signature pair
     **/
-    function castVoteBySig(uint proposalId, uint8 support, uint8 v, bytes32 r, bytes32 s) external {
+    function castVoteBySig(uint proposalId, uint8 support, uint castVersion, uint8 v, bytes32 r, bytes32 s) external {
         require(state(proposalId) == ProposalState.Active, "GovernorDelta::castVote: voting is closed");
-        bytes32 structHash = keccak256(abi.encode(VOTE_TYPEHASH, proposalId, support));
+        bytes32 structHash = keccak256(abi.encode(VOTE_TYPEHASH, proposalId, support, castVersion));
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator(), structHash));
         address signatory = ecrecover(digest, v, r, s);
         require(signatory != address(0), "GovernorDelta::castVoteBySig: invalid signature");
+        require(castVersion == proposals[proposalId].allowances[signatory].castVersion, "GovernorDelta::castVoteBySig: invalid cast version");
         uint votes = _logVote(signatory, proposalId, support, false);
 
         emit VoteCast(signatory, proposalId, support, votes, "");
@@ -619,28 +635,6 @@ contract GovernorDelta is GovernorStorageV3 {
     }
 
     /**
-      * @notice Commits a batch of proxy votes for a proposal 
-      * @param proposalId The id of the proposal to cast votes for
-      * @param delegateIds The delegation identifiers to commit
-    **/
-    function batchProxyVotes(uint proposalId, bytes[] memory delegateIds) public {
-        require(delegationActive, "GovernorDelta::batchProxyVotes: delegation not active");
-        require(state(proposalId) == ProposalState.Active, "GovernorDelta::castProxyVote: voting is closed");
-
-        for (uint i = 0; i < delegateIds.length; i++) {
-            require(checkDelegation(delegateIds[i]), "GovernorDelta::castProxyVote: delegation invalid");
-            (address delegator, address delegatee,) = abi.decode(delegateIds[i], (address, address, uint256));
-            Record memory receipt = (getRecords(proposalId, delegatee))[0];
-            Record memory record = (getRecords(proposalId, delegator))[1];
-            require(receipt.hasVoted, "GovernorDelta::castProxyVote: no intent signalled");
-            require(!record.hasVoted, "GovernorDelta::castProxyVote: delegation spent");
-            uint votes = _commitVote(delegator, proposalId, receipt.support);
-
-            emit VoteCast(delegatee, proposalId, receipt.support, votes, "");
-        }
-    }
-
-    /**
       * @notice Attests a batch of virtualized votes for a proposal during the timelock 
       * @param proposalId The id of the proposal to attest delegations for
       * @param delegateIds The delegation identifiers to attest
@@ -655,17 +649,19 @@ contract GovernorDelta is GovernorStorageV3 {
 
         for (uint i = 0; i < delegateIds.length; i++) {
             require(checkDelegation(delegateIds[i]), "GovernorDelta::batchAttestVotes: delegation invalid");
-            (address delegator, address delegatee, uint256 expiry) = abi.decode(delegateIds[i], (address, address, uint));
+            (address delegator, address delegatee,) = abi.decode(delegateIds[i], (address, address, uint));
             Record storage record = proposal.virtualized.records[delegator];
             Record storage receipt = proposal.primary.records[delegator];
-            require(record.hasVoted, "GovernorDelta::batchAttestVotes: delegation unspent");
+            Record storage delegateeReceipt = proposal.primary.records[delegatee];
+            require(record.hasVoted && record.delegatee == delegatee, "GovernorDelta::batchAttestVotes: delegation uncommitted");
+            require(delegateeReceipt.hasVoted && delegateeReceipt.delegatee == address(0), "GovernorDelta::batchAttestVotes: delegatee vote missing");
             require(!receipt.hasVoted, "GovernorDelta::batchAttestVotes: delegation already attested");
-            proposal.primary.totalWeight += record.weight;
+            _addVotes(proposal.primary, delegateeReceipt.support, record.votes, record.weight);
             receipt.hasVoted = true;
-
-            if (record.support == 0) proposal.primary.againstVotes += record.votes;
-            else if (record.support == 1) proposal.primary.forVotes += record.votes;
-            else if (record.support == 2) proposal.primary.abstainVotes += record.votes;
+            receipt.support = delegateeReceipt.support;
+            receipt.votes = record.votes;
+            receipt.weight = record.weight;
+            receipt.delegatee = delegatee;
 
             emit VoteAttested(proposalId, delegator, delegatee, record.votes, keccak256(delegateIds[i]));
         }
@@ -679,34 +675,77 @@ contract GovernorDelta is GovernorStorageV3 {
       * @param veto Whether the vote is a veto vote
     **/
     function _logVote(address voter, uint proposalId, uint8 support, bool veto) internal returns (uint) {
-        Stake storage stake = stakes[voter];
+        Stake storage s = stakes[voter];
         ProposalV2 storage proposal = proposals[proposalId];
-        Ballot storage ballot = !veto ? proposal.primary : proposal.veto; 
         uint resolveTs = veto ? proposal.eta : proposal.endTime;
-        uint votes = veto ? stake.amount : predictedPower(voter, resolveTs);
-        stake.unlockTime = resolveTs;
- 
-        return _recordVote(voter, support, ballot, votes, stake.amount);
+        uint votes = s.amount;
+        if (!veto && s.amount > 0) votes = predictedPower(voter, resolveTs);
+        uint weight = s.amount;
+
+        if (veto) {
+            s.unlockTime = resolveTs;
+            return _recordVote(voter, support, proposal.veto, votes, weight, false);
+        }
+
+        Record storage receipt = proposal.primary.records[voter];
+        require(receipt.delegatee == address(0), "GovernorDelta::_logVote: delegation committed");
+
+        bool virtualized = votingModule.virtualized();
+        Ballot storage allowanceBallot = virtualized ? proposal.virtualized : proposal.primary;
+        Voucher storage allowance = proposal.allowances[voter];
+
+        if (!virtualized) {
+            votes += allowance.votes;
+            weight += allowance.weight;
+            allowance.castVersion++;
+            s.unlockTime = resolveTs;
+            return _recordVote(voter, support, proposal.primary, votes, weight, true);
+        }
+
+        require(!proposal.virtualized.records[voter].hasVoted, "GovernorDelta::_logVote: delegation committed");
+        bool revising = receipt.hasVoted;
+        uint8 previousSupport = receipt.support;
+        uint recordedVotes = _recordVote(voter, support, proposal.primary, votes, weight, true);
+        _recordAllowance(support, allowanceBallot, allowance, revising, previousSupport);
+        s.unlockTime = resolveTs;
+
+        return recordedVotes;
     }
 
     /**
-      * @notice Records a virtual delegated vote for a proposal
-      * @param voter The address casting the virtual vote on behalf of their delegatee
-      * @param proposalId The id of the proposal to vote on
-      * @param support The support value for the vote. 0=against, 1=for, 2=abstain
+      * @notice Commits a delegator's voting power to a delegatee allowance
+      * @param delegator The address whose voting power is being committed
+      * @param delegatee The address receiving the proposal allowance
+      * @param proposalId The id of the proposal to commit voting power to
     **/
-    function _commitVote(address voter, uint proposalId, uint8 support) internal returns (uint) {
+    function _commitVote(address delegator, address delegatee, uint proposalId) internal returns (uint) {
         ProposalV2 storage proposal = proposals[proposalId];
-        Ballot storage ballot = proposal.primary;
-        Stake storage stake = stakes[voter];
+        bool virtualized = votingModule.virtualized();
+        Ballot storage ballot = virtualized ? proposal.virtualized : proposal.primary;
+        Record storage record = ballot.records[delegator];
+        Stake storage s = stakes[delegator];
+        uint votes = predictedPower(delegator, proposal.endTime);
+        uint weight = s.amount;
 
-        if (votingModule.virtualized()) ballot = proposal.virtualized;
+        if (virtualized) {
+            require(!proposal.primary.records[delegator].hasVoted, "GovernorDelta::_commitVote: voter already voted");
+        }
 
-        uint weight = stake.amount; 
-        uint votes = predictedPower(voter, proposal.endTime);
-        stake.unlockTime = proposal.endTime;
+        if (record.hasVoted) {
+            require(record.delegatee != address(0), "GovernorDelta::_commitVote: voter already voted");
+            if (record.delegatee == delegatee) {
+                _updateVotes(proposal, ballot, record, virtualized, votes, weight);
+            } else {
+                _redirectVotes(proposal, ballot, record, virtualized, delegatee, votes, weight);
+            }
+        } else {
+            record.delegatee = delegatee;
+            _updateVotes(proposal, ballot, record, virtualized, votes, weight);
+            record.hasVoted = true;
+        }
 
-        return _recordVote(voter, support, ballot, votes, weight);
+        s.unlockTime = proposal.endTime;
+        return votes;
     }
 
     /**
@@ -716,23 +755,158 @@ contract GovernorDelta is GovernorStorageV3 {
       * @param ballot The ballot storage to record the vote in
       * @param votes The voting power to record
       * @param weight The canonical weight of the voter
+      * @param revisable Whether a prior vote can be replaced
     **/
-    function _recordVote(address voter, uint8 support, Ballot storage ballot, uint votes, uint weight) internal returns (uint) {
+    function _recordVote(address voter, uint8 support, Ballot storage ballot, uint votes, uint weight, bool revisable) internal returns (uint) {
         Record storage record = ballot.records[voter]; 
         require(support <= 2, "GovernorDelta::_recordVote: invalid vote type");
-        require(!record.hasVoted, "GovernorDelta::_recordVote: voter already voted");
 
-        if (support == 0) ballot.againstVotes += votes;
-        else if (support == 1) ballot.forVotes += votes;
-        else if (support == 2) ballot.abstainVotes += votes;
+        if (record.hasVoted) {
+            require(revisable, "GovernorDelta::_recordVote: voter already voted");
+            require(record.delegatee == address(0), "GovernorDelta::_recordVote: delegation committed");
+            _rebalanceVotes(ballot, record.support, record.votes, record.weight, support, votes, weight);
+        } else {
+            require(record.delegatee == address(0), "GovernorDelta::_recordVote: delegation committed");
+            _addVotes(ballot, support, votes, weight);
+        }
 
-        ballot.totalWeight += weight;
         record.hasVoted = true;
         record.support = support;
         record.weight = weight;
         record.votes = votes;
 
         return votes;
+    }
+
+    /**
+      * @notice Records a delegatee allowance in its selected ballot
+      * @param support The support value for the allowance
+      * @param ballot The ballot containing the allowance
+      * @param allowance The delegatee allowance being cast
+      * @param revising Whether the delegatee has already cast on the proposal
+      * @param previousSupport The delegatee's prior support value
+    **/
+    function _recordAllowance(uint8 support, Ballot storage ballot, Voucher storage allowance, bool revising, uint8 previousSupport) internal {
+        if (revising) {
+            _rebalanceVotes(ballot, previousSupport, allowance.votes, allowance.weight, support, allowance.votes, allowance.weight);
+        } else {
+            _addVotes(ballot, support, allowance.votes, allowance.weight);
+        }
+
+        allowance.castVersion++;
+    }
+
+    /**
+      * @notice Updates a delegatee allowance for a commitment
+      * @param proposal The proposal containing the delegatee's vote record
+      * @param ballot The ballot containing the allowance
+      * @param record The delegator's commitment record
+      * @param virtualized Whether the allowance is recorded in the virtualized ballot
+      * @param votes The delegator's current voting power
+      * @param weight The delegator's current voting weight
+    **/
+    function _updateVotes(ProposalV2 storage proposal, Ballot storage ballot, Record storage record, bool virtualized, uint votes, uint weight) internal {
+        Voucher storage allowance = proposal.allowances[record.delegatee];
+        uint addedVotes = votes;
+        uint addedWeight = weight;
+
+        if (record.hasVoted) {
+            require(votes >= record.votes && weight >= record.weight, "GovernorDelta::_updateVotes: voting power decreased");
+            require(votes > record.votes || weight > record.weight, "GovernorDelta::_updateVotes: delegation already committed");
+            addedVotes = votes - record.votes;
+            addedWeight = weight - record.weight;
+        }
+
+        allowance.votes += addedVotes;
+        allowance.weight += addedWeight;
+
+        Record storage receipt = proposal.primary.records[record.delegatee];
+        if (receipt.hasVoted && receipt.delegatee == address(0)) {
+            _addVotes(ballot, receipt.support, addedVotes, addedWeight);
+            if (!virtualized) {
+                receipt.votes += addedVotes;
+                receipt.weight += addedWeight;
+            }
+        }
+
+        record.votes = votes;
+        record.weight = weight;
+        record.commitVersion++;
+    }
+
+    /**
+      * @notice Redirects a commitment between delegatee allowances
+      * @param proposal The proposal containing the delegatees' vote records
+      * @param ballot The ballot containing the allowances
+      * @param record The delegator's commitment record
+      * @param virtualized Whether the allowances are recorded in the virtualized ballot
+      * @param delegatee The new delegatee
+      * @param votes The delegator's current voting power
+      * @param weight The delegator's current voting weight
+    **/
+    function _redirectVotes(ProposalV2 storage proposal, Ballot storage ballot, Record storage record, bool virtualized, address delegatee, uint votes, uint weight) internal {
+        Voucher storage previousAllowance = proposal.allowances[record.delegatee];
+        Record storage previousReceipt = proposal.primary.records[record.delegatee];
+
+        if (previousReceipt.hasVoted && previousReceipt.delegatee == address(0)) {
+            _subtractVotes(ballot, previousReceipt.support, record.votes, record.weight);
+            if (!virtualized) {
+                previousReceipt.votes -= record.votes;
+                previousReceipt.weight -= record.weight;
+            }
+        }
+
+        previousAllowance.votes -= record.votes;
+        previousAllowance.weight -= record.weight;
+
+        record.delegatee = delegatee;
+        Voucher storage allowance = proposal.allowances[delegatee];
+        allowance.votes += votes;
+        allowance.weight += weight;
+
+        Record storage receipt = proposal.primary.records[delegatee];
+        if (receipt.hasVoted && receipt.delegatee == address(0)) {
+            _addVotes(ballot, receipt.support, votes, weight);
+            if (!virtualized) {
+                receipt.votes += votes;
+                receipt.weight += weight;
+            }
+        }
+
+        record.votes = votes;
+        record.weight = weight;
+        record.commitVersion++;
+    }
+
+    /**
+      * @notice Rebalances a prior vote before writing its replacement
+      * @param ballot The ballot containing the vote
+      * @param previousSupport The prior support value
+      * @param previousVotes The prior vote amount
+      * @param previousWeight The prior vote weight
+      * @param support The replacement support value
+      * @param votes The replacement vote amount
+      * @param weight The replacement vote weight
+    **/
+    function _rebalanceVotes(Ballot storage ballot, uint8 previousSupport, uint previousVotes, uint previousWeight, uint8 support, uint votes, uint weight) internal {
+        _subtractVotes(ballot, previousSupport, previousVotes, previousWeight);
+        _addVotes(ballot, support, votes, weight);
+    }
+
+    function _addVotes(Ballot storage ballot, uint8 support, uint votes, uint weight) internal {
+        if (support == 0) ballot.againstVotes += votes;
+        else if (support == 1) ballot.forVotes += votes;
+        else if (support == 2) ballot.abstainVotes += votes;
+
+        ballot.totalWeight += weight;
+    }
+
+    function _subtractVotes(Ballot storage ballot, uint8 support, uint votes, uint weight) internal {
+        if (support == 0) ballot.againstVotes -= votes;
+        else if (support == 1) ballot.forVotes -= votes;
+        else if (support == 2) ballot.abstainVotes -= votes;
+
+        ballot.totalWeight -= weight;
     }
 
     /**
