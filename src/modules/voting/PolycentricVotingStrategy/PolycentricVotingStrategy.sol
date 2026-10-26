@@ -4,7 +4,7 @@ import "@interfaces/IGovernorDelta.sol";
 import "@interfaces/ITimeWeightedVotingStrategy.sol";
 import "@interfaces/IVotingStrategy.sol";
 
-import { UD60x18, ud, convert } from "@prb/math/src/UD60x18.sol";
+import { UD60x18, ud, convert } from "@prb-math/src/UD60x18.sol";
 
 contract PolycentricVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrategy {
 

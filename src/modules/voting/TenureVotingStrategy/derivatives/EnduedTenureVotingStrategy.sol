@@ -2,9 +2,9 @@
 pragma solidity ^0.8.10;
 
 import "@strategies/TenureVotingStrategy.sol";
-import "@strategies/extensions/BootstrappedVotingStrategy.sol";
+import "@strategies/extensions/EnduedVotingStrategy.sol";
 
-contract BootstrappedTenureVotingStrategy is TenureVotingStrategy, BootstrappedVotingStrategy {
+contract EnduedTenureVotingStrategy is TenureVotingStrategy, EnduedVotingStrategy {
 
     /**
       * @notice Initialisation

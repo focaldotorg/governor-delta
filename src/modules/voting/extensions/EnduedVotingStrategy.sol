@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.10;
 
-import "@interfaces/IBootstrappedVotingStrategy.sol";
+import "@interfaces/IEnduedVotingStrategy.sol";
 
-abstract contract BootstrappedVotingStrategy is IBootstrappedVotingStrategy {
+abstract contract EnduedVotingStrategy is IEnduedVotingStrategy {
 
     /// @notice Maximum range of seed lifetime 
     uint constant public MAX_SEED_TIME = 365 days;
