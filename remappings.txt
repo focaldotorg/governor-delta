@@ -1,7 +1,7 @@
 @interfaces/=src/interfaces
 @lib/=src/lib/
 @root/=src/
-@strategies=src/modules/strategies/
+@voting=src/modules/voting/
 @guards=src/modules/guards
 
 forge-std/=lib/forge-std/src/

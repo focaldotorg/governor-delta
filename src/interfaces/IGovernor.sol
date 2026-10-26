@@ -27,6 +27,9 @@ interface IGovernor {
     /// @param reason The reason given for the vote by the voter
     event VetoVoteCast(address indexed voter, uint proposalId, uint8 support, uint votes, string reason);
 
+    /// @notice Emitted when delegated voting power is committed to a proposal allowance
+    event VoteCommitted(uint256 indexed proposalId, address delegator, address indexed delegatee, uint votes, bytes32 indexed id);
+
     /// @notice Emitted when a virtualized vote is attested and promoted to the primary tally during timelock
     event VoteAttested(uint256 indexed proposalId, address delegator, address indexed delegatee, uint votes, bytes32 indexed id);
 

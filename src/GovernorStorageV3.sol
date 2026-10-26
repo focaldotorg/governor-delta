@@ -238,6 +238,8 @@ contract GovernorStorageV3 is IGovernor, GovernorStorageV2 {
         bool executed;
         /// @notice Flag marking whether the proposal has been vetoed
         bool contested;
+        /// @notice Delegated voting power committed to each delegatee
+        mapping (address => Voucher) allowances;
     }
 
     /// @notice Proposal vote record
@@ -254,6 +256,16 @@ contract GovernorStorageV3 is IGovernor, GovernorStorageV2 {
         mapping (address => Record) records;
     }
 
+    /// @notice Voting power committed to a delegatee for a proposal
+    struct Voucher {
+        /// @notice Current delegated votes available to the delegatee
+        uint votes;
+        /// @notice Current delegated weight available to the delegatee
+        uint weight;
+        /// @notice Number of times the allowance has been cast
+        uint castVersion;
+    }
+
     /// @notice Proposal voter record
     struct Record {
         /// @notice Whether or not a vote has been cast
@@ -264,6 +276,10 @@ contract GovernorStorageV3 is IGovernor, GovernorStorageV2 {
         uint votes;
         /// @notice The number of tokens the voter had, which were cast 
         uint weight;
+        /// @notice The delegatee associated with a delegated commitment
+        address delegatee;
+        /// @notice Number of times the delegator has committed voting power
+        uint commitVersion;
     }
 
     /// @notice Proposal configuration 

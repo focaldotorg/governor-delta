@@ -29,4 +29,9 @@ contract GovernorAdmin is GovernorDelta {
         RelaxedTimelock(payable(address(timelock))).revokeAdmin(address(this));
     }
 
+    function getVirtualTally(uint proposalId) external view returns (uint, uint, uint) {
+        ProposalV2 storage p = proposals[proposalId];
+        return (p.virtualized.againstVotes, p.virtualized.forVotes, p.virtualized.abstainVotes);
+    }
+
 }

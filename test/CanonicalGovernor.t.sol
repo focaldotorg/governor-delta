@@ -32,14 +32,131 @@ contract CanonicalGovernorTest is BaseGovernorTest {
         return new GovernorAdmin();
     }
 
+    function testVoteRevision() public {
+        /* ------PRIMARY-STAKEHOLDER------- */
+        vm.startPrank(STAKEHOLDER_PRIMARY);
+        approveAndLock(STAKEHOLDER_MAJOR);
+        uint proposalId = pushMockProposal(0);
+
+        vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
+
+        governor.castVote(proposalId, 1, "");
+        governorToken.mint(STAKEHOLDER_PRIMARY, STAKEHOLDER_MINOR);
+        approveAndLock(STAKEHOLDER_MINOR);
+        governor.castVote(proposalId, 0, "");
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        (uint againstVotes, uint forVotes,) = governor.getTally(proposalId);
+        require(againstVotes == STAKEHOLDER_MAJOR + STAKEHOLDER_MINOR);
+        require(forVotes == 0);
+    }
+
+    function testDelegatedVoteRevision() public {
+        uint delegationExpiry = block.timestamp + 7 days;
+
+        /* ------PRIMARY-DELEGATOR------- */
+        vm.startPrank(DELEGATOR_PRIMARY);
+        governor.delegate(DELEGATEE_PRIMARY, delegationExpiry);
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        /* ------PRIMARY-DELEGATEE------- */
+        vm.startPrank(DELEGATEE_PRIMARY);
+        uint proposalId = pushMockProposal(0);
+        vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        /* ------PRIMARY-DELEGATEE------- */
+        (uint committedAgainstVotes, uint committedForVotes,) = governor.getTally(proposalId);
+        require(committedAgainstVotes == 0);
+        require(committedForVotes == 0);
+        vm.prank(DELEGATEE_PRIMARY);
+        governor.castVote(proposalId, 1, "");
+
+        (, uint signalledForVotes,) = governor.getTally(proposalId);
+        require(signalledForVotes == STAKEHOLDER_MINOR);
+        /* -------------------------------- */
+
+        /* ------RELAYER------- */
+        vm.prank(RELAYER);
+        commitDelegation(proposalId, DELEGATOR_PRIMARY, DELEGATEE_PRIMARY, delegationExpiry);
+        /* -------------------------------- */
+
+        (, uint committedDelegateForVotes,) = governor.getTally(proposalId);
+        require(committedDelegateForVotes == STAKEHOLDER_MINOR * 2);
+
+        /* ------PRIMARY-DELEGATEE------- */
+        vm.prank(DELEGATEE_PRIMARY);
+        governor.castVote(proposalId, 0, "");
+        /* -------------------------------- */
+
+        (uint againstVotes, uint forVotes,) = governor.getTally(proposalId);
+        require(againstVotes == STAKEHOLDER_MINOR * 2);
+        require(forVotes == 0);
+    }
+
+    function testDelegatedVoteRecommit() public {
+        uint delegationExpiry = block.timestamp + 7 days;
+
+        /* ------PRIMARY-DELEGATOR------- */
+        vm.startPrank(DELEGATOR_PRIMARY);
+        governor.delegate(DELEGATEE_PRIMARY, delegationExpiry);
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        /* ------PRIMARY-DELEGATEE------- */
+        vm.startPrank(DELEGATEE_PRIMARY);
+        uint proposalId = pushMockProposal(0);
+        vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        /* ------RELAYER------- */
+        vm.prank(RELAYER);
+        commitDelegation(proposalId, DELEGATOR_PRIMARY, DELEGATEE_PRIMARY, delegationExpiry);
+        /* -------------------------------- */
+
+        /* ------PRIMARY-DELEGATEE------- */
+        vm.prank(DELEGATEE_PRIMARY);
+        governor.castVote(proposalId, 1, "");
+        /* -------------------------------- */
+
+        /* ------PRIMARY-DELEGATOR------- */
+        vm.startPrank(DELEGATOR_PRIMARY);
+        governorToken.mint(DELEGATOR_PRIMARY, STAKEHOLDER_MINOR);
+        approveAndLock(STAKEHOLDER_MINOR);
+        vm.stopPrank();
+        /* -------------------------------- */
+
+        /* ------RELAYER------- */
+        vm.prank(RELAYER);
+        commitDelegation(proposalId, DELEGATOR_PRIMARY, DELEGATEE_PRIMARY, delegationExpiry);
+        /* -------------------------------- */
+
+        (, uint updatedForVotes,) = governor.getTally(proposalId);
+        require(updatedForVotes == STAKEHOLDER_MINOR * 3);
+
+        /* ------PRIMARY-DELEGATEE------- */
+        vm.prank(DELEGATEE_PRIMARY);
+        governor.castVote(proposalId, 0, "");
+        /* -------------------------------- */
+
+        (uint againstVotes, uint forVotes,) = governor.getTally(proposalId);
+        require(againstVotes == STAKEHOLDER_MINOR * 3);
+        require(forVotes == 0);
+    }
+
     function testDelegate() public {
         /* ------PRIMARY-DELEGATOR------- */
         vm.startPrank(DELEGATOR_PRIMARY);
+        uint primaryTs = block.timestamp + 7 days;
         // Cant delegate past the max threshold
         vm.expectRevert();
         governor.delegate(DELEGATEE_PRIMARY, block.timestamp + 366 days);
         //////////////////////////////////////
-        governor.delegate(DELEGATEE_PRIMARY, block.timestamp + 7 days);
+        governor.delegate(DELEGATEE_PRIMARY, primaryTs);
         vm.stopPrank();
         /* -------------------------------- */ 
 
@@ -49,8 +166,8 @@ contract CanonicalGovernorTest is BaseGovernorTest {
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
+        commitDelegation(proposalId, DELEGATOR_PRIMARY, DELEGATEE_PRIMARY);
         governor.castVote(proposalId, 1, "");
-        governor.castVirtualVote(proposalId, 1, DELEGATOR_PRIMARY);
         vm.stopPrank();
         /* -------------------------------- */
 
@@ -86,7 +203,7 @@ contract CanonicalGovernorTest is BaseGovernorTest {
         governor.castVote(proposalId, 1, "");
         // Delegatee cant spend delegation that is no longer active
         vm.expectRevert();
-        governor.castVirtualVote(proposalId + 1, 1, DELEGATOR_PRIMARY);
+        commitDelegation(proposalId + 1, DELEGATOR_PRIMARY, DELEGATEE_PRIMARY, primaryTs);
         //////////////////////////////////////
         vm.stopPrank();
         /* -------------------------------- */
@@ -98,7 +215,8 @@ contract CanonicalGovernorTest is BaseGovernorTest {
     function testRedelegate() public {
         /* ------PRIMARY-DELEGATOR------- */
         vm.startPrank(DELEGATOR_PRIMARY);
-        governor.delegate(DELEGATEE_PRIMARY, block.timestamp + 1 days);
+        uint primaryTs = block.timestamp + 1 days;
+        governor.delegate(DELEGATEE_PRIMARY, primaryTs);
         vm.stopPrank();
         /* -------------------------------- */ 
 
@@ -117,13 +235,14 @@ contract CanonicalGovernorTest is BaseGovernorTest {
         governor.castVote(proposalId, 1, "");
         // Cant use expired delegation 
         vm.expectRevert();
-        governor.castVirtualVote(proposalId, 1, DELEGATOR_PRIMARY);
+        commitDelegation(proposalId, DELEGATOR_PRIMARY, DELEGATEE_PRIMARY, primaryTs);
         /* -------------------------------- */ 
 
         /* ------PRIMARY-DELEGATOR------- */
         vm.startPrank(DELEGATOR_PRIMARY);
         // Delegator can redelegate because of expiry
-        governor.delegate(DELEGATEE_SECONDARY, block.timestamp + 1 days);
+        uint redelegationTs = block.timestamp + 1 days;
+        governor.delegate(DELEGATEE_SECONDARY, redelegationTs);
         vm.stopPrank();
         /* -------------------------------- */ 
 
@@ -131,14 +250,14 @@ contract CanonicalGovernorTest is BaseGovernorTest {
         vm.startPrank(DELEGATEE_PRIMARY);
         // Cant use expired delegation 
         vm.expectRevert();
-        governor.castVirtualVote(proposalId, 1, DELEGATOR_PRIMARY);
+        commitDelegation(proposalId, DELEGATOR_PRIMARY, DELEGATEE_PRIMARY, redelegationTs);
         /* -------------------------------- */
 
         /* ------SEOCNDARY-DELEGATEE------- */
         vm.startPrank(DELEGATEE_SECONDARY);
+        commitDelegation(proposalId, DELEGATOR_PRIMARY, DELEGATEE_SECONDARY);
+        commitDelegation(proposalId, DELEGATOR_SECONDARY, DELEGATEE_SECONDARY);
         governor.castVote(proposalId, 1, "");
-        governor.castVirtualVote(proposalId, 1, DELEGATOR_PRIMARY);
-        governor.castVirtualVote(proposalId, 1, DELEGATOR_SECONDARY);
         /* -------------------------------- */ 
 
         vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
@@ -160,8 +279,8 @@ contract CanonicalGovernorTest is BaseGovernorTest {
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
+        commitDelegation(proposalId, DELEGATOR_PRIMARY, DELEGATEE_PRIMARY);
         governor.castVote(proposalId, 1, "");
-        governor.castVirtualVote(proposalId, 1, DELEGATOR_PRIMARY);
         vm.stopPrank();
         /* -------------------------------- */
 
@@ -375,8 +494,8 @@ contract CanonicalGovernorTest is BaseGovernorTest {
 
         vm.warp(block.timestamp + DEFAULT_VOTING_DELAY + 1);
 
+        commitDelegation(proposalId, delegator, DELEGATEE_PRIMARY);
         governor.castVote(proposalId, 1, "");
-        governor.castVirtualVote(proposalId, 1, delegator);
         vm.stopPrank();
         /* -------------------------------- */
 
@@ -415,23 +534,18 @@ contract CanonicalGovernorTest is BaseGovernorTest {
 
         /* ------SECONDARY-DELEGATEE------- */
         vm.startPrank(DELEGATEE_SECONDARY);
+        commitDelegation(proposalId, DELEGATOR_SECONDARY, DELEGATEE_SECONDARY, secondaryTs);
         governor.castVote(proposalId, 1, "");
         vm.stopPrank();
         /* -------------------------------- */
-
-        bytes[] memory votes = new bytes[](1);
-        votes[0] = abi.encode(DELEGATOR_PRIMARY, DELEGATEE_PRIMARY, primaryTs);
 
         // Fast forward to expire primary delegation
         vm.warp(block.timestamp + 1 days);
 
         // Vote cast should fail with expired delegation 
         vm.expectRevert();
-        governor.batchProxyVotes(proposalId, votes);
+        commitDelegation(proposalId, DELEGATOR_PRIMARY, DELEGATEE_PRIMARY, primaryTs);
         /////////////////////////////////////
-        votes[0] = abi.encode(DELEGATOR_SECONDARY, DELEGATEE_SECONDARY, secondaryTs);
-        governor.batchProxyVotes(proposalId, votes);
-
         vm.warp(block.timestamp + DEFAULT_VOTING_PERIOD);
 
         (, uint finalVotes,)= governor.getTally(proposalId);
