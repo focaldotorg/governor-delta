@@ -4,5 +4,11 @@
   },
   "lib/openzeppelin-contracts": {
     "rev": "5fd1781b1454fd1ef8e722282f86f9293cacf256"
+  },
+  "lib/prb-math": {
+    "branch": {
+      "name": "release-v4",
+      "rev": "ee6d92d1ab32ba27e8d06eded0e01b74efb3c076"
+    }
   }
 }
