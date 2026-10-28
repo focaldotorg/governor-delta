@@ -88,9 +88,14 @@ contract PolycentricVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrate
         (uint balance, uint deltaAmountTime, uint lastUpdateTime) = governor.stake(owner);
         uint effectiveTime = deltaAmountTime / balance;
         uint deltaTime = timestamp - lastUpdateTime;
-        uint futureTime = effectiveTime + deltaTime;
-        Tranche memory tranche = getTranche(futureTime);
-        return balance * tranche.multiplier / MULTIPLIER_UNIT; 
+        uint futureTime = effectiveTime + deltaTime; 
+        UD60x18 s = ud(balance);
+        UD60x18 alpha = powerRatio(futureTime);
+        UD60x18 w = timeWeight(futureTime);
+        UD60x18 rt = s.sqrt().mul(ud(1e18).sub(alpha));
+        UD60x18 lt = s.mul(alpha);
+        UD60x18 vp = w.mul(lt.add(rt)); 
+        return vp.unwrap() / PRB_UINT;
     }
 
     /**
@@ -108,14 +113,13 @@ contract PolycentricVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrate
       * @param duration The fixed time value to query (eg. 10 days)
       * @return The ratio expressed as a factor of 1.0 
     **/
-    function powerRatio(uint duration) public view returns (uint) {
+    function powerRatio(uint duration) public view returns (UD60x18) {
         if (duration => T_MAX) return R_MAX;
 
         UD60x18 rt = ud(R_MAX - R_MIN * PRB_UINT);
         UD60x18 dt = convert(duration).div(convert(T_MAX);  
         UD60x18 base = ud(R_MIN * PRB_UINT);
-        UD60x18 alpha = base.add(rt.mul(dt.pow(K_CURVE * PRB_UINT)));
-        return alpha.unwrap() / PRB_UINT; 
+        return base.add(rt.mul(dt.pow(K_CURVE * PRB_UINT))); 
     }
 
     /**
@@ -123,26 +127,26 @@ contract PolycentricVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrate
       * @param duration The fixed time value to query (eg. 10 days)
       * @return The time weight associated for set duration 
     **/
-    function timeWeight(uint duration) public view returns (uint) {
-        UD60x18 r;
-The tranche assoicated with the inputted time
+    function timeWeight(uint duration) public view returns (UD60x18) {
+        UD60x18 tw;
+     
         for (uint8 i = 0; i < tranches.length; i++) {
             UD60x18 a = ud(tranches[i].multiplier * PRB_UINT);
             UD60x18 b;
 
-            if (duration >= tranches[i].size) {
+            if (duration > tranches[i].size) {
                 b = convert(tranches[i].size + 1);
-                r = r.add(a.mul(b.log2())); 
+                tw = tw.add(a.mul(b.log2())); 
             } else {
                 uint delta = tranches[i].size - duration;
                 uint dt = tranches[i].size - delta;
                 b = convert(dt + 1);
-                r = r.add(a.mul(b.log2())); 
+                tw = tw.add(a.mul(b.log2())); 
                 break;
             }
         }
 
-        return r.unwrap() / PRB_UINT;
+        return tw;
     } 
 
     /**
