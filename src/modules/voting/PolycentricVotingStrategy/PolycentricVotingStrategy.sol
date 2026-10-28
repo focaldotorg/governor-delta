@@ -104,13 +104,28 @@ contract PolycentricVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrate
     }
 
     /**
-      * @notice Returns the equivalent tranche for a indexed duration 
+      * @notice Returns the power ratio coefficient for indexed duration 
       * @param duration The fixed time value to query (eg. 10 days)
-      * @return The tranche assoicated with the inputted time 
+      * @return The ratio expressed as a factor of 1.0 
+    **/
+    function powerRatio(uint duration) public view returns (uint) {
+        if (duration => T_MAX) return R_MAX;
+
+        UD60x18 rt = ud(R_MAX - R_MIN * PRB_UINT);
+        UD60x18 dt = convert(duration).div(convert(T_MAX);  
+        UD60x18 base = ud(R_MIN * PRB_UINT);
+        UD60x18 alpha = base.add(rt.mul(dt.pow(K_CURVE * PRB_UINT)));
+        return alpha.unwrap() / PRB_UINT; 
+    }
+
+    /**
+      * @notice Returns the equivalent weight for indexed duration 
+      * @param duration The fixed time value to query (eg. 10 days)
+      * @return The time weight associated for set duration 
     **/
     function timeWeight(uint duration) public view returns (uint) {
         UD60x18 r;
-
+The tranche assoicated with the inputted time
         for (uint8 i = 0; i < tranches.length; i++) {
             UD60x18 a = ud(tranches[i].multiplier * PRB_UINT);
             UD60x18 b;
