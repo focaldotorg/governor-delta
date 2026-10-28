@@ -4,7 +4,7 @@ import "@interfaces/IGovernorDelta.sol";
 import "@interfaces/ITimeWeightedVotingStrategy.sol";
 import "@interfaces/IVotingStrategy.sol";
 
-import { UD60x18, ud, convert } from "@prb-math/src/UD60x18.sol";
+import { UD60x18, convert, ud } from "@prb-math/src/UD60x18.sol";
 
 contract PolycentricVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrategy {
 
@@ -14,29 +14,34 @@ contract PolycentricVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrate
     /// @notice Governor target context  
     IGovernorDelta public governor; 
 
-    /// @notice Base multiplier scaling unit 
+    /// @notice Base multiplier scaling unit (1.0)
     uint constant public MULTIPLIER_UNIT = 1e6;
 
-    /// @notice Maximum multiplier value
-    uint constant public MAX_MULTIPLIER = 1e6;
+    /// @notice Maximum multiplier value (1.0)
+    uint constant public MAX_MULTIPLIER = MULTIPLIER_UNIT;
 
-    /// @notice Minimum alpha value
+    /// @notice Minimum alpha value (0.2)
     uint constant public R_MIN = 2e5;
 
-    /// @notice Maximum alpha value
-    uint constant public R_MAX = 1e6;
+    /// @notice Maximum alpha value (1.0)
+    uint constant public R_MAX = MULTIPLIER_UNIT;
 
-    /// @notice Voting curve coefficent  
-    uint constant public K_CURVE = 5e5;   
+    /// @notice Maximum time value to consitute tenure
+    uint constant public T_MAX = 730 days;
 
-    /// @notice Minimum tranche boundary / size 
+    /// @notice Voting curve coefficient (0.5)
+    uint constant public K_CURVE = 5e5;
+
+    /// @notice Minimum tranche boundary / size
     uint constant public MIN_TRANCHE_SIZE = 30 days;
 
-    /// @notice Maximum tranche boundary / size 
+    /// @notice Maximum tranche boundary / size
     uint constant public MAX_TRANCHE_SIZE = 1000 days;
 
     /// @notice Maximum tranche total 
     uint constant public MAX_TRANCHE_COUNT = 10;
+
+    uint constant PRB_UINT = 1e18 / MULTIPLIER_UNIT; 
 
     /**
       * @notice Initialisation
@@ -97,6 +102,33 @@ contract PolycentricVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrate
         (uint balance,,) = governor.stake(owner);
         return balance;
     }
+
+    /**
+      * @notice Returns the equivalent tranche for a indexed duration 
+      * @param duration The fixed time value to query (eg. 10 days)
+      * @return The tranche assoicated with the inputted time 
+    **/
+    function timeWeight(uint duration) public view returns (uint) {
+        UD60x18 r;
+
+        for (uint8 i = 0; i < tranches.length; i++) {
+            UD60x18 a = ud(tranches[i].multiplier * PRB_UINT);
+            UD60x18 b;
+
+            if (duration >= tranches[i].size) {
+                b = convert(tranches[i].size + 1);
+                r = r.add(a.mul(b.log2())); 
+            } else {
+                uint delta = tranches[i].size - duration;
+                uint dt = tranches[i].size - delta;
+                b = convert(dt + 1);
+                r = r.add(a.mul(b.log2())); 
+                break;
+            }
+        }
+
+        return r.unwrap() / PRB_UINT;
+    } 
 
     /**
       * @notice Returns the equivalent tranche for a indexed duration 
