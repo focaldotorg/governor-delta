@@ -34,15 +34,15 @@ contract EnduedTenureVotingStrategy is TenureVotingStrategy, EnduedVotingStrateg
       * @return The future voting power of the account 
     **/
     function predict(address owner, uint timestamp)   
-        override(TenureVotingStrategy, BootstrappedVotingStrategy) 
+        override(TenureVotingStrategy, EnduedVotingStrategy) 
     public view returns (uint) {
         if (timestamp < block.timestamp) return 0;
 
         (uint balance, uint deltaAmountTime, uint lastUpdateTime) = governor.stake(owner);
-        uint baseEffectiveTime = deltaAmountTime / balance;
+        uint effectiveTime = deltaAmountTime / balance;
         uint deltaTime = timestamp - lastUpdateTime;
-        uint futureTime = baseEffectiveTime + deltaTime;
-        uint realisedTime = seededEffectiveTime(owner) + futureTime;
+        uint futureTime = effectiveTime + deltaTime;
+        uint realisedTime = seededTime(owner) + futureTime;
         Tranche memory tranche = getTranche(realisedTime);
         return balance * tranche.multiplier / MULTIPLIER_UNIT; 
     }
