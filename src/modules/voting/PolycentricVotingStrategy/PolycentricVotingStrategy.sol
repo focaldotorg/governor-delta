@@ -41,6 +41,7 @@ contract PolycentricVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrate
     /// @notice Maximum tranche total 
     uint constant public MAX_TRANCHE_COUNT = 10;
 
+    /// @notice Math conversion unit
     uint constant PRB_UINT = 1e18 / MULTIPLIER_UNIT; 
 
     /**
@@ -90,12 +91,13 @@ contract PolycentricVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrate
         uint deltaTime = timestamp - lastUpdateTime;
         uint futureTime = effectiveTime + deltaTime; 
         UD60x18 s = ud(balance);
-        UD60x18 alpha = powerRatio(futureTime);
         UD60x18 w = timeWeight(futureTime);
-        UD60x18 rt = s.sqrt().mul(ud(1e18).sub(alpha));
+        // V_P = W(α · S + sqrt(S) · (1 - α))
+        UD60x18 alpha = powerRatio(futureTime);
+        UD60x18 rt = s.sqrt().mul(convert(1).sub(alpha));
         UD60x18 lt = s.mul(alpha);
-        UD60x18 vp = w.mul(lt.add(rt)); 
-        return vp.unwrap() / PRB_UINT;
+        // Where lt = α · S, rt = sqrt(S) · (1 - α) and alpha = α 
+        return w.mul(lt.add(rt)).unwrap() / PRB_UINT;
     }
 
     /**
@@ -115,11 +117,13 @@ contract PolycentricVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrate
     **/
     function powerRatio(uint duration) public view returns (UD60x18) {
         if (duration => T_MAX) return R_MAX;
-
+        // α = r_min + (r_max - r_min) · (t_eff / t_max)^k
         UD60x18 rt = ud(R_MAX - R_MIN * PRB_UINT);
         UD60x18 dt = convert(duration).div(convert(T_MAX);  
         UD60x18 base = ud(R_MIN * PRB_UINT);
-        return base.add(rt.mul(dt.pow(K_CURVE * PRB_UINT))); 
+        UD60x18 k = ud(K_CURVE * PRB_UINT);
+        // Where t_eff = duration,  rt = (r_max - r_min) and dt = (t_eff / t_max) 
+        return base.add(rt.mul(dt.pow(k))); 
     }
 
     /**
@@ -128,8 +132,8 @@ contract PolycentricVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrate
       * @return The time weight associated for set duration 
     **/
     function timeWeight(uint duration) public view returns (UD60x18) {
-        UD60x18 tw;
-     
+        UD60x18 tw;   
+        // W(t_eff) = sum_{i=0}^{N} P_i * log2(t_i + 1)
         for (uint8 i = 0; i < tranches.length; i++) {
             UD60x18 a = ud(tranches[i].multiplier * PRB_UINT);
             UD60x18 b;
@@ -144,6 +148,7 @@ contract PolycentricVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrate
                 tw = tw.add(a.mul(b.log2())); 
                 break;
             }
+            // Where t_eff = duration and b = P_i * log2(t_i + 1)
         }
 
         return tw;
