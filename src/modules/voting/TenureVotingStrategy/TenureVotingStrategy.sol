@@ -69,12 +69,22 @@ contract TenureVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrategy {
     function predict(address owner, uint timestamp) public virtual view returns (uint) {
         if (timestamp < block.timestamp) return 0;
 
-        (uint balance, uint deltaAmountTime, uint lastUpdateTime) = governor.stake(owner);
-        uint effectiveTime = deltaAmountTime / balance;
+        (uint amount, uint deltaAmountTime, uint lastUpdateTime) = governor.stake(owner);
+        uint effectiveTime = deltaAmountTime / amount;
         uint deltaTime = timestamp - lastUpdateTime;
         uint futureTime = effectiveTime + deltaTime;
         Tranche memory tranche = getTranche(futureTime);
-        return balance * tranche.multiplier / MULTIPLIER_UNIT; 
+        return amount * tranche.multiplier / MULTIPLIER_UNIT; 
+    }
+
+    /**
+      * @notice Returns an account's current effective time
+      * @param owner The address to query for
+      * @return The account t_eff value 
+    **/
+    function effectiveTime(address owner) external view returns (uint) {
+        (uint amount, uint deltaAmountTime,) = governor.stake(owner);
+        return deltaAmountTime / amount;
     }
 
     /**

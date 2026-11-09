@@ -34,7 +34,7 @@ contract EnduedPolycentricVotingStrategy is PolycentricVotingStrategy, EnduedVot
       * @return The future voting power of the account 
     **/
     function predict(address owner, uint timestamp)   
-        override(PolycentricVotingStrategy, BootstrappedVotingStrategy) 
+        override(PolycentricVotingStrategy, EnduedVotingStrategy) 
     public view returns (uint) {
         if (timestamp < block.timestamp) return 0;
 

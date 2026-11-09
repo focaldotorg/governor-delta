@@ -65,6 +65,26 @@ contract PolycentricVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrate
     }
 
     /**
+      * @notice Returns the current voting weight of a given account
+      * @param owner The address to query for
+      * @return The voting weight of the account 
+    **/
+    function weight(address owner) external view returns (uint) {
+        (uint balance,,) = governor.stake(owner);
+        return balance;
+    }
+
+    /**
+      * @notice Returns an account's current effective time
+      * @param owner The address to query for
+      * @return The account t_eff value 
+    **/
+    function effectiveTime(address owner) external view returns (uint) {
+        (uint amount, uint deltaAmountTime,) = governor.stake(owner);
+        return deltaAmountTime / amount;
+    }
+
+    /**
       * @notice Returns the current voting power of a given account
       * @param owner The address to query for
       * @return The voting power of the account 
@@ -86,11 +106,11 @@ contract PolycentricVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrate
     function predict(address owner, uint timestamp) public virtual view returns (uint) {
         if (timestamp < block.timestamp) return 0;
 
-        (uint balance, uint deltaAmountTime, uint lastUpdateTime) = governor.stake(owner);
-        uint effectiveTime = deltaAmountTime / balance;
+        (uint amount, uint deltaAmountTime, uint lastUpdateTime) = governor.stake(owner);
+        uint effectiveTime = deltaAmountTime / amount;
         uint deltaTime = timestamp - lastUpdateTime;
         uint futureTime = effectiveTime + deltaTime; 
-        UD60x18 s = ud(balance);
+        UD60x18 s = ud(amount);
         UD60x18 w = timeWeight(futureTime);
         // V_P = W(α · S + sqrt(S) · (1 - α))
         UD60x18 alpha = powerRatio(futureTime);
@@ -101,13 +121,15 @@ contract PolycentricVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrate
     }
 
     /**
-      * @notice Returns the current voting weight of a given account
+      * @notice Returns the power ratio for a given account 
       * @param owner The address to query for
-      * @return The voting weight of the account 
+      * @return The ratio to linear and root weighting 
     **/
-    function weight(address owner) external view returns (uint) {
-        (uint balance,,) = governor.stake(owner);
-        return balance;
+    function alpha(address owner) external view returns (uint) {
+        (uint amount, uint deltaAmountTime,) = governor.stake(owner);
+        uint effectiveTime = deltaAmountTime / amount;
+        UD60x18 ratio = powerRatio(effectiveTime);
+        return ratio.unwrap() / PRB_UINT;
     }
 
     /**
