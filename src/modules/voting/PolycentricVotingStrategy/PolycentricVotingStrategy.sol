@@ -20,6 +20,9 @@ contract PolycentricVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrate
     /// @notice Maximum multiplier value (1.0)
     uint constant public MAX_MULTIPLIER = MULTIPLIER_UNIT;
 
+    /// @notice Minimum multiplier value (0.1)
+    uint constant public MIN_MULTIPLIER = 1e5;
+
     /// @notice Minimum alpha value (0.2)
     uint constant public R_MIN = 2e5;
 
@@ -210,7 +213,7 @@ contract PolycentricVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrate
 
             if (target.size < MIN_TRANCHE_SIZE) return false;
             if (target.size > MAX_TRANCHE_SIZE) return false;
-            if (target.multiplier < MULTIPLIER_UNIT) return false;
+            if (target.multiplier < MIN_MULTIPLIER) return false;
             if (target.multiplier > MAX_MULTIPLIER) return false;
             if (i == config.length - 1) break;
             if (target.size >= config[i + 1].size) return false;

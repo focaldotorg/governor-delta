@@ -15,8 +15,11 @@ contract TenureVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrategy {
     /// @notice Base multiplier scaling unit 
     uint constant public MULTIPLIER_UNIT = 1e6;
 
-    /// @notice Maximum multiplier value
+    /// @notice Maximum multiplier value (2.0)
     uint constant public MAX_MULTIPLIER = 2e6;
+
+    /// @notice Minimum multiplier value (1.0)
+    uint constant public MIN_MULTIPLIER = MULTIPLIER_UINT;
 
     /// @notice Minimum tranche boundary / size 
     uint constant public MIN_TRANCHE_SIZE = 30 days;
@@ -99,7 +102,7 @@ contract TenureVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrategy {
 
     /**
       * @notice Returns the equivalent tranche for a indexed duration 
-      * @param duration The fixed time value to query (eg. 10 days)
+      * @param duration The fixed time value (in seconds) to query
       * @return The tranche assoicated with the inputted time 
     **/
     function getTranche(uint duration) public view returns (Tranche memory) {
@@ -129,7 +132,7 @@ contract TenureVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrategy {
 
             if (target.size < MIN_TRANCHE_SIZE) return false;
             if (target.size > MAX_TRANCHE_SIZE) return false;
-            if (target.multiplier < MULTIPLIER_UNIT) return false;
+            if (target.multiplier < MIN_MULTIPLIER) return false;
             if (target.multiplier > MAX_MULTIPLIER) return false;
             if (i == config.length - 1) break;
             if (target.size >= config[i + 1].size) return false;
