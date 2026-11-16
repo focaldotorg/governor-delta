@@ -1,9 +1,9 @@
 pragma solidity ^0.8.10;
 
 import "@interfaces/IGovernorAlpha.sol";
-import "@strategies/WeightedVotingStrategy.sol";
+import "@strategies/WeightedVotingStrategy/WeightedVotingStrategy.sol";
 import "@root/GovernorStorageV3.sol";
-import "@guards/StakingGuard.sol";
+import "@guards/StakingGuard/StakingGuard.sol";
 
 /** FOCAL RESEARCH COLLECTIVE © 2026 **/
 

@@ -1,7 +1,7 @@
 pragma solidity ^0.8.13;
 
 import { ITimeWeightedVotingStrategy } from "@interfaces/ITimeWeightedVotingStrategy.sol";
-import { TenureVotingStrategy } from "@strategies/TenureVotingStrategy.sol";
+import { TenureVotingStrategy } from "@strategies/TenureVotingStrategy/TenureVotingStrategy.sol";
 import { GovernorAdmin } from "./mock/GovernorAdmin.sol";
 import { BaseGovernorTest } from "./BaseGovernor.t.sol";
 
@@ -35,11 +35,11 @@ contract VirtualGovernorTest is BaseGovernorTest {
 
         ITimeWeightedVotingStrategy.Tranche[] memory tranches = new ITimeWeightedVotingStrategy.Tranche[](5);
 
-        tranches[0] = ITimeWeightedVotingStrategy.Tranche(30 days, 10e6);
-        tranches[1] = ITimeWeightedVotingStrategy.Tranche(60 days, 12e6);
-        tranches[2] = ITimeWeightedVotingStrategy.Tranche(90 days, 15e6);
-        tranches[3] = ITimeWeightedVotingStrategy.Tranche(180 days, 17e6);
-        tranches[4] = ITimeWeightedVotingStrategy.Tranche(365 days, 20e6);
+        tranches[0] = ITimeWeightedVotingStrategy.Tranche(30 days, 1e6);
+        tranches[1] = ITimeWeightedVotingStrategy.Tranche(60 days, 1.2e6);
+        tranches[2] = ITimeWeightedVotingStrategy.Tranche(90 days, 1.5e6);
+        tranches[3] = ITimeWeightedVotingStrategy.Tranche(180 days, 1.7e6);
+        tranches[4] = ITimeWeightedVotingStrategy.Tranche(365 days, 2e6);
 
         strategy = new TenureVotingStrategy(address(governor), tranches);
 
