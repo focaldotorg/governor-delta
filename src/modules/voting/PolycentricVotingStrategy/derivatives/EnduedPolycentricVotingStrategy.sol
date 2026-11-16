@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.10;
 
-import "@strategies/PolycentricVotingStrategy.sol";
+import "@strategies/PolycentricVotingStrategy/PolycentricVotingStrategy.sol";
 import "@strategies/extensions/EnduedVotingStrategy.sol";
 
 contract EnduedPolycentricVotingStrategy is PolycentricVotingStrategy, EnduedVotingStrategy {
@@ -13,7 +13,7 @@ contract EnduedPolycentricVotingStrategy is PolycentricVotingStrategy, EnduedVot
       * @param seeds_ Preallocated power multiplier values 
     **/
     constructor(address governor_, Tranche[] memory tranches_, Seed[] memory seeds_) 
-        TenureVotingStrategy(governor_, tranches_) 
+        PolycentricVotingStrategy(governor_, tranches_) 
     public {
         for (uint i = 0; i < seeds_.length; i++) {
             address seedAccount = seeds_[i].account;
@@ -49,7 +49,7 @@ contract EnduedPolycentricVotingStrategy is PolycentricVotingStrategy, EnduedVot
         UD60x18 rt = s.sqrt().mul(convert(1).sub(alpha));
         UD60x18 lt = s.mul(alpha);
         // Where lt = α · S, rt = sqrt(S) · (1 - α) and alpha = α 
-        return w.mul(lt.add(rt)).unwrap() / PRB_UINT;
+        return w.mul(lt.add(rt)).unwrap() / PRB_UNIT;
     }
 
 }

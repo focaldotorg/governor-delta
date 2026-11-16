@@ -19,7 +19,7 @@ contract TenureVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrategy {
     uint constant public MAX_MULTIPLIER = 2e6;
 
     /// @notice Minimum multiplier value (1.0)
-    uint constant public MIN_MULTIPLIER = MULTIPLIER_UINT;
+    uint constant public MIN_MULTIPLIER = MULTIPLIER_UNIT;
 
     /// @notice Minimum tranche boundary / size 
     uint constant public MIN_TRANCHE_SIZE = 30 days;

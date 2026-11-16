@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.10;
 
-import "@strategies/TenureVotingStrategy.sol";
+import "@strategies/TenureVotingStrategy/TenureVotingStrategy.sol";
 import "@strategies/extensions/EnduedVotingStrategy.sol";
 
 contract EnduedTenureVotingStrategy is TenureVotingStrategy, EnduedVotingStrategy {
