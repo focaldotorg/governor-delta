@@ -1,6 +1,6 @@
 pragma solidity ^0.8.10;
 
-interface IBootstrappedVotingStrategy {
+interface IEnduedVotingStrategy {
 
     struct Seed {
         /// @notice The address to assign seed 

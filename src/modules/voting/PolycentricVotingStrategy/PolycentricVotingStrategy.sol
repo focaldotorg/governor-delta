@@ -1,0 +1,240 @@
+pragma solidity ^0.8.10;
+
+import "@interfaces/IGovernorDelta.sol";
+import "@interfaces/ITimeWeightedVotingStrategy.sol";
+import "@interfaces/IVotingStrategy.sol";
+
+import { UD60x18, convert, ud } from "@prb-math/src/UD60x18.sol";
+
+contract PolycentricVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrategy {
+
+    /// @notice Discrete power multiplier values 
+    Tranche[] public tranches;
+
+    /// @notice Governor target context  
+    IGovernorDelta public governor; 
+
+    /// @notice Base multiplier scaling unit (1.0)
+    uint constant public MULTIPLIER_UNIT = 1e6;
+
+    /// @notice Maximum multiplier value (1.0)
+    uint constant public MAX_MULTIPLIER = MULTIPLIER_UNIT;
+
+    /// @notice Minimum multiplier value (0.1)
+    uint constant public MIN_MULTIPLIER = 1e5;
+
+    /// @notice Minimum alpha value (0.2)
+    uint constant public R_MIN = 2e5;
+
+    /// @notice Maximum alpha value (1.0)
+    uint constant public R_MAX = MULTIPLIER_UNIT;
+
+    /// @notice Maximum time value to consitute tenure
+    uint constant public T_MAX = 730 days;
+
+    /// @notice Voting curve coefficient (0.5)
+    uint constant public K_CURVE = 5e5;
+
+    /// @notice Minimum tranche boundary / size
+    uint constant public MIN_TRANCHE_SIZE = 30 days;
+
+    /// @notice Maximum tranche boundary / size
+    uint constant public MAX_TRANCHE_SIZE = 1000 days;
+
+    /// @notice Maximum tranche total 
+    uint constant public MAX_TRANCHE_COUNT = 10;
+
+    /// @notice Math conversion unit
+    uint constant PRB_UNIT = 1e18 / MULTIPLIER_UNIT; 
+
+    /**
+      * @notice Initialisation
+      * @param governor_ Target governor context address
+      * @param tranches_ Power multiplier target value array 
+    **/
+    constructor(address governor_, Tranche[] memory tranches_) public {
+        require(checkTranches(tranches_), "TenureVotingStrategy::checkTranches: invalid config");
+
+        governor = IGovernorDelta(governor_);
+        tranches = tranches_;
+    }
+
+    /**
+      * @notice Returns the module configuration type  
+      * @return A boolean value to indicate whether the module has virtual weighting
+    **/
+    function virtualized() external pure returns (bool) {
+        return true;
+    }
+
+    /**
+      * @notice Returns the current voting weight of a given account
+      * @param owner The address to query for
+      * @return The voting weight of the account 
+    **/
+    function weight(address owner) external view returns (uint) {
+        (uint balance,,) = governor.stake(owner);
+        return balance;
+    }
+
+    /**
+      * @notice Returns an account's current effective time
+      * @param owner The address to query for
+      * @return The account t_eff value 
+    **/
+    function effectiveTime(address owner) external view returns (uint) {
+        (uint amount, uint deltaAmountTime,) = governor.stake(owner);
+        return deltaAmountTime / amount;
+    }
+
+    /**
+      * @notice Returns the current voting power of a given account
+      * @param owner The address to query for
+      * @return The voting power of the account 
+      * @dev Uses capital time integral to compute averaged time weight (effective time)
+      * @dev When effectie time reaches a tranche boundry, the multiplier is applied
+    **/
+    function power(address owner) external view returns (uint) {
+        return predict(owner, block.timestamp); 
+    }
+
+    /**
+      * @notice Returns the future projected voting power of a given account
+      * @param owner The address to query for
+      * @param timestamp The future time to query the voting power at
+      * @return The future voting power of the account 
+      * @dev Uses capital time integral to compute averaged time weight (effective time)
+      * @dev Projects future effective time through addition of future time delta
+    **/
+    function predict(address owner, uint timestamp) public virtual view returns (uint) {
+        if (timestamp < block.timestamp) return 0;
+
+        (uint amount, uint deltaAmountTime, uint lastUpdateTime) = governor.stake(owner);
+        uint effectiveTime = deltaAmountTime / amount;
+        uint deltaTime = timestamp - lastUpdateTime;
+        uint futureTime = effectiveTime + deltaTime; 
+        UD60x18 s = ud(amount);
+        UD60x18 w = timeWeight(futureTime);
+        // V_P = W(α · S + sqrt(S) · (1 - α))
+        UD60x18 alpha = powerRatio(futureTime);
+        UD60x18 rt = s.sqrt().mul(convert(1).sub(alpha));
+        UD60x18 lt = s.mul(alpha);
+        // Where lt = α · S, rt = sqrt(S) · (1 - α) and alpha = α 
+        return w.mul(lt.add(rt)).unwrap() / PRB_UNIT;
+    }
+
+    /**
+      * @notice Returns the power ratio for a given account 
+      * @param owner The address to query for
+      * @return The ratio to linear and root weighting 
+    **/
+    function alpha(address owner) external view returns (uint) {
+        (uint amount, uint deltaAmountTime,) = governor.stake(owner);
+        uint effectiveTime = deltaAmountTime / amount;
+        UD60x18 ratio = powerRatio(effectiveTime);
+        return ratio.unwrap() / PRB_UNIT;
+    }
+
+    /**
+      * @notice Returns the power ratio coefficient for indexed duration 
+      * @param duration The fixed time value (in seconds) to query 
+      * @return The ratio expressed as a factor of 1.0 
+    **/
+    function powerRatio(uint duration) public view returns (UD60x18) {
+        if (duration >= T_MAX) return ud(R_MAX * PRB_UNIT);
+        // α = r_min + (r_max - r_min) · (t_eff / t_max)^k
+        UD60x18 rt = ud(R_MAX - R_MIN * PRB_UNIT);
+        UD60x18 dt = convert(duration).div(convert(T_MAX));  
+        UD60x18 base = ud(R_MIN * PRB_UNIT);
+        UD60x18 k = ud(K_CURVE * PRB_UNIT);
+        // Where t_eff = duration,  rt = (r_max - r_min) and dt = (t_eff / t_max) 
+        return base.add(rt.mul(dt.pow(k))); 
+    }
+
+    /**
+      * @notice Returns the equivalent weight for indexed duration 
+      * @param duration The fixed time value (in seconds) to query
+      * @return The time weight associated for set duration 
+    **/
+    function timeWeight(uint duration) public view returns (UD60x18) {
+        UD60x18 tw;  
+        uint last;
+        uint remainder = duration; 
+        // W(t_eff) = sum_{i=0}^{N} P_i * log2(t_i + 1)
+        for (uint8 i = 0; i < tranches.length; i++) {
+            uint limit = tranches[i].size;
+            uint width = i != tranches.length - 1 ? limit - last : remainder;
+            uint elapsed = remainder < width ? remainder : width;
+            // Where t_eff = duration and p = P_i * log2(t_i + 1)
+            if (elapsed > 0) {
+              UD60x18 dt = ud(elapsed * 1e18 / 1 days + 1e18);
+              UD60x18 p = ud(tranches[i].multiplier * PRB_UNIT);
+              tw = tw.add(p.mul(dt.log2()));
+            } 
+
+            remainder -= elapsed;
+            last = limit;
+
+            if (remainder == 0) break;
+        }
+
+        return tw;
+    } 
+
+    /**
+      * @notice Returns the equivalent tranche for a indexed duration 
+      * @param duration The fixed time value (in seconds) to query
+      * @return The tranche assoicated with the inputted time 
+    **/
+    function getTranche(uint duration) public view returns (Tranche memory) {
+        Tranche memory selector = tranches[0]; 
+
+        for (uint8 i = 0; i < tranches.length; i++) {
+            if (duration >= tranches[i].size) {
+                selector = tranches[i];
+            } else {
+                break;
+            }
+        }
+
+        return selector;
+    } 
+
+    /**
+      * @notice Checks whether a tranche configuration is correct
+      * @param config The tranche config array
+      * @return The boolean indicating whether the config is valid 
+    **/
+    function checkTranches(Tranche[] memory config) public pure returns (bool) {
+        if (config.length > MAX_TRANCHE_COUNT) return false;
+
+        for (uint8 i = 0; i < config.length; i++) {
+            Tranche memory target = config[i];
+
+            if (target.size < MIN_TRANCHE_SIZE) return false;
+            if (target.size > MAX_TRANCHE_SIZE) return false;
+            if (target.multiplier < MIN_MULTIPLIER) return false;
+            if (target.multiplier > MAX_MULTIPLIER) return false;
+            if (i == config.length - 1) break;
+            if (target.size >= config[i + 1].size) return false;
+            if (target.multiplier >= config[i + 1].multiplier) return false;
+        }
+
+        return true;
+    } 
+
+    /**
+      * @notice Admin function to set the tranche configuration 
+      * @param config The tranche config array
+    **/
+    function set(Tranche[] memory config) external {
+        require(checkTranches(config), "TenureVotingStrategy::checkTranches: invalid config");
+        require(msg.sender == address(governor), "TenureVotingStrategy::_setTranches: governor only");
+        Tranche[] memory oldTranches = tranches;
+        tranches = config;
+
+        emit NewTranches(oldTranches, tranches);
+    }
+
+}
+

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.10;
 
-import "@strategies/TenureVotingStrategy.sol";
-import "@strategies/extensions/BootstrappedVotingStrategy.sol";
+import "@strategies/PolycentricVotingStrategy/PolycentricVotingStrategy.sol";
+import "@strategies/extensions/EnduedVotingStrategy.sol";
 
-contract BootstrappedTenureVotingStrategy is TenureVotingStrategy, BootstrappedVotingStrategy {
+contract EnduedPolycentricVotingStrategy is PolycentricVotingStrategy, EnduedVotingStrategy {
 
     /**
       * @notice Initialisation
@@ -13,14 +13,13 @@ contract BootstrappedTenureVotingStrategy is TenureVotingStrategy, BootstrappedV
       * @param seeds_ Preallocated power multiplier values 
     **/
     constructor(address governor_, Tranche[] memory tranches_, Seed[] memory seeds_) 
-        TenureVotingStrategy(governor_, tranches_) 
+        PolycentricVotingStrategy(governor_, tranches_) 
     public {
         for (uint i = 0; i < seeds_.length; i++) {
             address seedAccount = seeds_[i].account;
             uint seedValue = seeds_[i].basisTime;
             uint seedTime = seeds_[i].lifeTime;
             require(seedAccount != address(0), "TenureVotingStrategy::init: zero seed address");
-            require(seedValue >= MULTIPLIER_UNIT, "TenureVotingStrategy::init: seed value lte decimal factor");
             require(seedTime > block.timestamp, "TenureVotingStrategy::init: invalid seed expiration");
             require(seedTime - block.timestamp <= MAX_SEED_TIME, "TenureVotingStrategy::init: invalid seed period");
             seeds[seedAccount] = seeds_[i];
@@ -30,21 +29,27 @@ contract BootstrappedTenureVotingStrategy is TenureVotingStrategy, BootstrappedV
     /**
       * @notice Returns the future projected voting power of a given account
       * @param owner The address to query for
-      * @param timestamp The future time to query the voting power at
+      * @param timestamp The future date time value to query voting power 
       * @return The future voting power of the account 
     **/
     function predict(address owner, uint timestamp)   
-        override(TenureVotingStrategy, BootstrappedVotingStrategy) 
+        override(PolycentricVotingStrategy, EnduedVotingStrategy) 
     public view returns (uint) {
         if (timestamp < block.timestamp) return 0;
 
         (uint balance, uint deltaAmountTime, uint lastUpdateTime) = governor.stake(owner);
-        uint baseEffectiveTime = deltaAmountTime / balance;
+        uint effectiveTime = deltaAmountTime / balance;
         uint deltaTime = timestamp - lastUpdateTime;
-        uint futureTime = baseEffectiveTime + deltaTime;
-        uint realisedTime = seededEffectiveTime(owner) + futureTime;
-        Tranche memory tranche = getTranche(realisedTime);
-        return balance * tranche.multiplier / MULTIPLIER_UNIT; 
+        uint futureTime = effectiveTime + deltaTime;
+        uint realisedTime = seededTime(owner, timestamp) + futureTime;
+        UD60x18 s = ud(balance);
+        UD60x18 w = timeWeight(futureTime);
+        // V_P = W(α · S + sqrt(S) · (1 - α))
+        UD60x18 alpha = powerRatio(futureTime);
+        UD60x18 rt = s.sqrt().mul(convert(1).sub(alpha));
+        UD60x18 lt = s.mul(alpha);
+        // Where lt = α · S, rt = sqrt(S) · (1 - α) and alpha = α 
+        return w.mul(lt.add(rt)).unwrap() / PRB_UNIT;
     }
 
 }

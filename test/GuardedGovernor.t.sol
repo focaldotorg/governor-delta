@@ -1,9 +1,9 @@
 pragma solidity ^0.8.13;
 
-import { TransferGuard, GuardStorage } from "@guards/TransferGuard.sol";
-import { WhitelistGuard } from "@guards/WhitelistGuard.sol";
-import { FunctionSelectorGuard } from "@guards/FunctionSelectorGuard.sol";
-import { StakingGuard } from "@guards/StakingGuard.sol";
+import { TransferGuard, GuardStorage } from "@guards/TransferGuard/TransferGuard.sol";
+import { WhitelistGuard } from "@guards/WhitelistGuard/WhitelistGuard.sol";
+import { SelectorGuard } from "@guards/SelectorGuard/SelectorGuard.sol";
+import { StakingGuard } from "@guards/StakingGuard/StakingGuard.sol";
 import { GovernorDelta } from "@root/GovernorDelta.sol";
 import { BaseGovernorTest } from "./BaseGovernor.t.sol";
 import { GovernorStorageV3 } from "@root/GovernorStorageV3.sol";
@@ -35,7 +35,7 @@ contract GuardedGovernorTest is BaseGovernorTest {
         address[] memory policyOne = new address[](3);
         policyOne[0] = guards[0];
         policyOne[1] = address(new WhitelistGuard(address(governor), contactsOne));
-        policyOne[2] = address(new FunctionSelectorGuard(address(governor), selectorsOne));
+        policyOne[2] = address(new SelectorGuard(address(governor), selectorsOne));
 
         // Guard policy two configuration
 
@@ -58,7 +58,7 @@ contract GuardedGovernorTest is BaseGovernorTest {
         address[] memory policyTwo = new address[](4);
         policyTwo[0] = guards[0];
         policyTwo[1] = address(new TransferGuard(address(governor), budget));
-        policyTwo[2] = address(new FunctionSelectorGuard(address(governor), selectorsTwo));
+        policyTwo[2] = address(new SelectorGuard(address(governor), selectorsTwo));
         policyTwo[3] = address(new WhitelistGuard(address(governor), contactsTwo));
 
         // Store transfer guard target for later

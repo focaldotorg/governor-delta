@@ -200,7 +200,7 @@ s.deltaAmountTime = s.deltaAmountTime * (s.amount - amount) / s.amount;
 
 **[2]** While designed to combat vote-buying, unironically creates the new issue of proposers exercising voting power they may not still retain. Which is a primary subject of the empty voting problem [⁴](#notes), labelled as a record-date capture attack. An adversary can create a malicious proposal, vote and then continue to relinquish the equivalent economic value on secondary markets, yet still have their weight meaningfully recorded in the [Ballot](#ballots). A problem that would be only be exacerbated if a group of actors colluded together, Delta is not subject to flaw given the omission of the checkpoint system.
 
-**[3]** Gosling, _Polycentric Voting_ (2026), Focal Research Collective 
+**[3]** Gosling, Samuel J., _Polycentric Voting_ (2026), Focal Research Collective 
 
 **[4]** Hu & Black, _Empty Voting and Hidden (Morphable) Ownership_ (2006), Southern California Law Review
 
