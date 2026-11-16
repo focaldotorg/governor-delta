@@ -134,7 +134,7 @@ contract PolycentricVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrate
 
     /**
       * @notice Returns the power ratio coefficient for indexed duration 
-      * @param duration The fixed time value to query (eg. 10 days)
+      * @param duration The fixed time value (in seconds) to query 
       * @return The ratio expressed as a factor of 1.0 
     **/
     function powerRatio(uint duration) public view returns (UD60x18) {
@@ -150,27 +150,29 @@ contract PolycentricVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrate
 
     /**
       * @notice Returns the equivalent weight for indexed duration 
-      * @param duration The fixed time value to query (eg. 10 days)
+      * @param duration The fixed time value (in seconds) to query
       * @return The time weight associated for set duration 
     **/
     function timeWeight(uint duration) public view returns (UD60x18) {
-        UD60x18 tw;   
+        UD60x18 tw;  
+        uint last;
+        uint remainder = duration; 
         // W(t_eff) = sum_{i=0}^{N} P_i * log2(t_i + 1)
         for (uint8 i = 0; i < tranches.length; i++) {
-            UD60x18 a = ud(tranches[i].multiplier * PRB_UINT);
-            UD60x18 b;
+            uint limit = tranches[i].size;
+            uint width = i != tranches.length - 1 ? limit - last : remainder;
+            uint elapsed = remainder < width ? remainder : width;
+            // Where t_eff = duration and p = P_i * log2(t_i + 1)
+            if (elapsed > 0) {
+              UD60x18 dt = ud(elapsed * 1e18 / 1 days + 1e18);
+              UD60x18 p = ud(tranches[i].multiplier * PRB_UINT);
+              tw = tw.add(p.mul(dt.log2()));
+            } 
 
-            if (duration > tranches[i].size) {
-                b = convert(tranches[i].size + 1);
-                tw = tw.add(a.mul(b.log2())); 
-            } else {
-                uint delta = tranches[i].size - duration;
-                uint dt = tranches[i].size - delta;
-                b = convert(dt + 1);
-                tw = tw.add(a.mul(b.log2())); 
-                break;
-            }
-            // Where t_eff = duration and b = P_i * log2(t_i + 1)
+            remainder -= elapsed;
+            last = limit;
+
+            if (remainder == 0) break;
         }
 
         return tw;
@@ -178,7 +180,7 @@ contract PolycentricVotingStrategy is IVotingStrategy, ITimeWeightedVotingStrate
 
     /**
       * @notice Returns the equivalent tranche for a indexed duration 
-      * @param duration The fixed time value to query (eg. 10 days)
+      * @param duration The fixed time value (in seconds) to query
       * @return The tranche assoicated with the inputted time 
     **/
     function getTranche(uint duration) public view returns (Tranche memory) {
