@@ -20,7 +20,6 @@ contract EnduedTenureVotingStrategy is TenureVotingStrategy, EnduedVotingStrateg
             uint seedValue = seeds_[i].basisTime;
             uint seedTime = seeds_[i].lifeTime;
             require(seedAccount != address(0), "TenureVotingStrategy::init: zero seed address");
-            require(seedValue >= MULTIPLIER_UNIT, "TenureVotingStrategy::init: seed value lte decimal factor");
             require(seedTime > block.timestamp, "TenureVotingStrategy::init: invalid seed expiration");
             require(seedTime - block.timestamp <= MAX_SEED_TIME, "TenureVotingStrategy::init: invalid seed period");
             seeds[seedAccount] = seeds_[i];
@@ -30,7 +29,7 @@ contract EnduedTenureVotingStrategy is TenureVotingStrategy, EnduedVotingStrateg
     /**
       * @notice Returns the future projected voting power of a given account
       * @param owner The address to query for
-      * @param timestamp The future time to query the voting power at
+      * @param timestamp The future date time value to query voting power  
       * @return The future voting power of the account 
     **/
     function predict(address owner, uint timestamp)   
@@ -42,7 +41,7 @@ contract EnduedTenureVotingStrategy is TenureVotingStrategy, EnduedVotingStrateg
         uint effectiveTime = deltaAmountTime / balance;
         uint deltaTime = timestamp - lastUpdateTime;
         uint futureTime = effectiveTime + deltaTime;
-        uint realisedTime = seededTime(owner) + futureTime;
+        uint realisedTime = seededTime(owner, timestamp) + futureTime;
         Tranche memory tranche = getTranche(realisedTime);
         return balance * tranche.multiplier / MULTIPLIER_UNIT; 
     }

@@ -14,11 +14,12 @@ abstract contract EnduedVotingStrategy is IEnduedVotingStrategy {
     /**
       * @notice Get seeded effective time for an account  
       * @param owner The address to query for
+      * @param timestamp The date time unix timestamp to query 
       * @return Baseline effective time 
     **/
-    function seededTime(address owner) public view returns (uint) {
+    function seededTime(address owner, uint timestamp) public view returns (uint) {
         Seed storage seed = seeds[owner];
-        return seed.lifeTime > block.timestamp ? seed.basisTime : 0;
+        return seed.lifeTime > timestamp ? seed.basisTime : 0;
     }
 
     /**
